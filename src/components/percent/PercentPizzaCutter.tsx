@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Check } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 export const PercentPizzaCutter: React.FC = () => {
   const [totalSlices, setTotalSlices] = useState<number>(4); // Cut into 2, 4, 5, 8, 10 pieces
@@ -9,12 +10,18 @@ export const PercentPizzaCutter: React.FC = () => {
   const decimal = (selectedSlices / totalSlices).toFixed(2);
 
   const handleSliceClick = (sliceIdx: number) => {
-    // Toggling slice count
+    sounds.playSlice();
     if (sliceIdx + 1 === selectedSlices) {
       setSelectedSlices(Math.max(1, selectedSlices - 1));
     } else {
       setSelectedSlices(sliceIdx + 1);
     }
+  };
+
+  const handlePresetSelect = (n: number) => {
+    sounds.playPop();
+    setTotalSlices(n);
+    setSelectedSlices(1);
   };
 
   return (
@@ -45,10 +52,7 @@ export const PercentPizzaCutter: React.FC = () => {
           ].map((item) => (
             <button
               key={item.n}
-              onClick={() => {
-                setTotalSlices(item.n);
-                setSelectedSlices(1);
-              }}
+              onClick={() => handlePresetSelect(item.n)}
               className={`px-3 py-1.5 rounded-xl transition-all ${
                 totalSlices === item.n
                   ? 'bg-rose-600 text-white font-bold shadow'
@@ -89,7 +93,7 @@ export const PercentPizzaCutter: React.FC = () => {
                     key={i}
                     d={pathData}
                     onClick={() => handleSliceClick(i)}
-                    className="cursor-pointer transition-all duration-200 hover:opacity-90"
+                    className="cursor-pointer transition-all duration-200 hover:opacity-90 active:scale-95"
                     fill={
                       isSelected
                         ? totalSlices === 2
@@ -123,7 +127,7 @@ export const PercentPizzaCutter: React.FC = () => {
 
           <span className="text-xs text-slate-400 mt-3 flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-            Klicke auf Stücke, um mehr oder weniger zu nehmen!
+            Klicke auf Stücke, um mehr oder weniger zu schneiden!
           </span>
         </div>
 

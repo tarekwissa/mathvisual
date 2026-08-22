@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Scissors, Box, Layers } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 export const Percent100ChunksConcept: React.FC = () => {
   const [totalValue, setTotalValue] = useState<number>(300); // e.g. 300 €
@@ -9,6 +10,18 @@ export const Percent100ChunksConcept: React.FC = () => {
   // 1 chunk is exactly totalValue / 100
   const oneChunkValue = totalValue / 100;
   const pickedValue = oneChunkValue * chunksCount;
+
+  const handleSliderChange = (val: number) => {
+    setChunksCount(val);
+    if (Math.random() < 0.3) {
+      sounds.playPop();
+    }
+  };
+
+  const handleUnitChange = (newUnit: string) => {
+    sounds.playPop();
+    setUnit(newUnit);
+  };
 
   return (
     <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
@@ -33,7 +46,7 @@ export const Percent100ChunksConcept: React.FC = () => {
           {['€ (Geld)', 'Schüler', 'Gramm', 'Follower'].map((u) => (
             <button
               key={u}
-              onClick={() => setUnit(u.split(' ')[0])}
+              onClick={() => handleUnitChange(u.split(' ')[0])}
               className={`px-3 py-1.5 rounded-xl transition-all ${
                 unit === u.split(' ')[0]
                   ? 'bg-amber-600 text-white font-bold shadow'
@@ -73,7 +86,10 @@ export const Percent100ChunksConcept: React.FC = () => {
               max="10000"
               step="10"
               value={totalValue}
-              onChange={(e) => setTotalValue(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => {
+                setTotalValue(Math.max(1, Number(e.target.value)));
+                sounds.playPop();
+              }}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-blue-400"
             />
           </div>
@@ -134,7 +150,7 @@ export const Percent100ChunksConcept: React.FC = () => {
           <span className="text-slate-300 font-bold">
             Wie viele der 100 Häppchen möchtest du nehmen? ({chunksCount} Teile = {chunksCount}%):
           </span>
-          <span className="font-mono text-xl font-extrabold text-amber-400 bg-amber-950/80 px-3 py-1 rounded-xl border border-amber-800/80">
+          <span className="font-mono text-2xl font-extrabold text-amber-400 bg-amber-950/80 px-4 py-1 rounded-xl border border-amber-800/80">
             {chunksCount} Häppchen ({chunksCount}%)
           </span>
         </div>
@@ -144,7 +160,7 @@ export const Percent100ChunksConcept: React.FC = () => {
           min="1"
           max="100"
           value={chunksCount}
-          onChange={(e) => setChunksCount(Number(e.target.value))}
+          onChange={(e) => handleSliderChange(Number(e.target.value))}
           className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
         />
 
@@ -155,7 +171,7 @@ export const Percent100ChunksConcept: React.FC = () => {
               key={i}
               className={`w-3.5 h-3.5 rounded-sm transition-all ${
                 i < chunksCount
-                  ? 'bg-amber-400 shadow-sm shadow-amber-400/50 scale-105'
+                  ? 'bg-amber-400 shadow-sm shadow-amber-400/50 scale-105 ring-1 ring-white/30'
                   : 'bg-slate-800 opacity-40'
               }`}
               title={`Häppchen #${i + 1} = ${oneChunkValue.toFixed(2)} ${unit}`}

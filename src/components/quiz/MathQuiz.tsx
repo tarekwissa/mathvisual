@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { Trophy, Flame, HelpCircle, CheckCircle, XCircle, ArrowRight, Award } from 'lucide-react';
 import { MathRenderer } from '../common/MathRenderer';
 import type { QuizQuestion } from '../../types/math';
+import { sounds } from '../../utils/soundEffects';
 
 const QUIZ_QUESTIONS: QuizQuestion[] = [
   // Prozentrechnung
@@ -126,27 +127,28 @@ export const MathQuiz: React.FC = () => {
     setIsAnswered(true);
 
     if (idx === currentQ.correctIndex) {
+      sounds.playSuccess();
       setScore(s => s + 10 + streak * 2);
       setStreak(st => st + 1);
-      // Trigger celebratory confetti
       confetti({
         particleCount: 70,
         spread: 60,
         origin: { y: 0.7 }
       });
     } else {
+      sounds.playError();
       setStreak(0);
     }
   };
 
   const handleNext = () => {
+    sounds.playPop();
     if (currentIndex < filteredQuestions.length - 1) {
       setCurrentIndex(c => c + 1);
       setSelectedAnswer(null);
       setIsAnswered(false);
       setShowHint(false);
     } else {
-      // Finished all questions in category
       setCurrentIndex(0);
       setSelectedAnswer(null);
       setIsAnswered(false);
@@ -199,6 +201,7 @@ export const MathQuiz: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => {
+                sounds.playPop();
                 setSelectedCategory(cat.id as any);
                 setCurrentIndex(0);
                 setIsAnswered(false);
@@ -297,7 +300,10 @@ export const MathQuiz: React.FC = () => {
           {/* Bottom Action Footer */}
           <div className="flex justify-between items-center pt-2">
             <button
-              onClick={() => setShowHint(!showHint)}
+              onClick={() => {
+                sounds.playPop();
+                setShowHint(!showHint);
+              }}
               className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium"
             >
               <HelpCircle className="w-3.5 h-3.5" />

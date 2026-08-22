@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { Eye, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 export const PercentIntuitionGame: React.FC = () => {
   const [targetPercent, setTargetPercent] = useState<number>(42);
@@ -11,7 +12,7 @@ export const PercentIntuitionGame: React.FC = () => {
   const [visualShape, setVisualShape] = useState<'bar' | 'circle' | 'grid'>('circle');
 
   const generateNewChallenge = () => {
-    // Random target between 5% and 95%
+    sounds.playPop();
     const randomP = Math.floor(Math.random() * 90) + 5;
     const shapes: ('bar' | 'circle' | 'grid')[] = ['circle', 'bar', 'grid'];
     const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
@@ -32,14 +33,17 @@ export const PercentIntuitionGame: React.FC = () => {
     const diff = Math.abs(guess - targetPercent);
     if (diff <= 3) {
       // Amazing guess
+      sounds.playSuccess();
       setScore(s => s + 30);
       setStreak(st => st + 1);
       confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
     } else if (diff <= 8) {
       // Good guess
+      sounds.playSuccess();
       setScore(s => s + 15);
       setStreak(st => st + 1);
     } else {
+      sounds.playError();
       setStreak(0);
     }
   };

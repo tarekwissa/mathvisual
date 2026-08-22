@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { RiemannRectangle } from '../../utils/mathParser';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move } from 'lucide-react';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 interface IntegralCanvasGraphProps {
   fn: (x: number) => number;
@@ -45,19 +46,61 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   const [yMin, setYMin] = useState<number>(-3);
   const [yMax, setYMax] = useState<number>(6);
 
+  // Drawing Animation (Point travelling along graph)
+  const [drawProgress, setDrawProgress] = useState<number>(1); // 0 to 1
+  const [isDrawingAnim, setIsDrawingAnim] = useState<boolean>(false);
+  const animFrameRef = useRef<number | null>(null);
+
   // Dragging / Pan state
   const [draggingMode, setDraggingMode] = useState<'a' | 'b' | 'acc' | 'pan' | null>(null);
   const [panStart, setPanStart] = useState<{ mx: number; my: number; xMin: number; xMax: number; yMin: number; yMax: number } | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; canvasX: number; canvasY: number } | null>(null);
 
+  // Start animated point-draw effect
+  const startDrawingAnimation = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+    }
+    setIsDrawingAnim(true);
+    setDrawProgress(0);
+
+    const startTime = performance.now();
+    const duration = 1200; // 1.2s smooth draw
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      setDrawProgress(progress);
+
+      // Sound sweep
+      if (Math.random() < 0.25) {
+        sounds.playGraphTraceSound(progress);
+      }
+
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsDrawingAnim(false);
+        animFrameRef.current = null;
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  // Trigger draw animation when function changes
+  useEffect(() => {
+    startDrawingAnimation();
+  }, [fn, startDrawingAnimation]);
+
   // Auto-fit view to current integration bounds
   const handleResetView = useCallback(() => {
+    sounds.playPop();
     const minBound = Math.min(a, b);
     const maxBound = Math.max(a, b);
     const span = Math.max(2, maxBound - minBound);
     const margin = span * 0.5;
     
-    // Sample function values to compute sensible y range
     let minVal = 0;
     let maxVal = 0;
     const testPoints = 40;
@@ -76,11 +119,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setYMin(parseFloat((Math.min(-1, minVal - ySpan * 0.25)).toFixed(1)));
     setYMax(parseFloat((Math.max(2, maxVal + ySpan * 0.25)).toFixed(1)));
   }, [a, b, fn]);
-
-  // Initial adjust
-  useEffect(() => {
-    handleResetView();
-  }, []);
 
   // Coordinate transforms
   const mathToCanvas = useCallback(
@@ -101,8 +139,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     [xMin, xMax, yMin, yMax]
   );
 
-  // Zoom Handler (at center or mouse position)
+  // Zoom Handler
   const handleZoom = (zoomFactor: number, centerMathX?: number, centerMathY?: number) => {
+    sounds.playPop();
     const currentCenterX = centerMathX !== undefined ? centerMathX : (xMin + xMax) / 2;
     const currentCenterY = centerMathY !== undefined ? centerMathY : (yMin + yMax) / 2;
 
@@ -112,7 +151,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     const newSpanX = currentSpanX * zoomFactor;
     const newSpanY = currentSpanY * zoomFactor;
 
-    // Constrain zoom levels
     if (newSpanX < 0.5 || newSpanX > 60) return;
 
     const ratioLeft = (currentCenterX - xMin) / currentSpanX;
@@ -124,7 +162,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setYMax(parseFloat((currentCenterY + (1 - ratioBottom) * newSpanY).toFixed(2)));
   };
 
-  // Mouse wheel zoom
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -138,8 +175,8 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     handleZoom(zoomFactor, mathPt.mx, mathPt.my);
   };
 
-  // Toggle fullscreen mode
   const toggleFullscreen = () => {
+    sounds.playPop();
     if (!containerRef.current) return;
 
     if (!isFullscreen) {
@@ -155,7 +192,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     }
   };
 
-  // Listen for fullscreen change events (e.g. Esc key pressed)
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -192,7 +228,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // 1. Grid calculation
+    // 1. Grid
     const spanX = xMax - xMin;
     const spanY = yMax - yMin;
 
@@ -211,7 +247,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
 
-    // Vertical grid lines
     const startGridX = Math.floor(xMin / xStep) * xStep;
     for (let x = startGridX; x <= xMax; x += xStep) {
       const { cx } = mathToCanvas(x, 0, width, height);
@@ -229,7 +264,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       }
     }
 
-    // Horizontal grid lines
     const startGridY = Math.floor(yMin / yStep) * yStep;
     for (let y = startGridY; y <= yMax; y += yStep) {
       const { cy } = mathToCanvas(0, y, width, height);
@@ -247,24 +281,21 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       }
     }
 
-    // 2. Main Axes
+    // 2. Axes
     const origin = mathToCanvas(0, 0, width, height);
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#94a3b8';
 
-    // X-Axis
     ctx.beginPath();
     ctx.moveTo(0, origin.cy);
     ctx.lineTo(width, origin.cy);
     ctx.stroke();
 
-    // Y-Axis
     ctx.beginPath();
     ctx.moveTo(origin.cx, 0);
     ctx.lineTo(origin.cx, height);
     ctx.stroke();
 
-    // Axis Labels
     ctx.fillStyle = '#cbd5e1';
     ctx.font = '12px Outfit, sans-serif';
     ctx.fillText('x', width - 15, Math.min(Math.max(origin.cy - 8, 15), height - 8));
@@ -349,16 +380,18 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       });
     }
 
-    // 5. Draw Primary Function f(x)
+    // 5. Draw Primary Function f(x) with Live Drawing Tracer Progress
     ctx.beginPath();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#38bdf8'; // Sky blue
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#38bdf8'; // Sky blue neon
 
     const plotSteps = width * 1.5;
+    const currentMaxStep = Math.floor(plotSteps * drawProgress);
     const dx = (xMax - xMin) / plotSteps;
     let started = false;
+    let tracerPt: { cx: number; cy: number; mx: number; my: number } | null = null;
 
-    for (let i = 0; i <= plotSteps; i++) {
+    for (let i = 0; i <= currentMaxStep; i++) {
       const x = xMin + i * dx;
       const y = fn(x);
 
@@ -370,9 +403,32 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         } else {
           ctx.lineTo(pt.cx, pt.cy);
         }
+        if (i === currentMaxStep) {
+          tracerPt = { cx: pt.cx, cy: pt.cy, mx: x, my: y };
+        }
       }
     }
     ctx.stroke();
+
+    // Draw the Glowing Traveling Point / Tracer Particle
+    if (tracerPt && (drawProgress < 1 || isDrawingAnim)) {
+      // Glow pulse
+      const glowGrad = ctx.createRadialGradient(tracerPt.cx, tracerPt.cy, 2, tracerPt.cx, tracerPt.cy, 18);
+      glowGrad.addColorStop(0, 'rgba(56, 189, 248, 1)');
+      glowGrad.addColorStop(0.4, 'rgba(56, 189, 248, 0.6)');
+      glowGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+      ctx.beginPath();
+      ctx.arc(tracerPt.cx, tracerPt.cy, 18, 0, Math.PI * 2);
+      ctx.fillStyle = glowGrad;
+      ctx.fill();
+
+      // Sharp center core
+      ctx.beginPath();
+      ctx.arc(tracerPt.cx, tracerPt.cy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
 
     // 6. Draw Second Function g(x) if present
     if (secondFn && mode === 'between') {
@@ -403,7 +459,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.beginPath();
       ctx.lineWidth = 2.5;
       ctx.setLineDash([6, 5]);
-      ctx.strokeStyle = '#c084fc'; // Purple
+      ctx.strokeStyle = '#c084fc';
 
       started = false;
       for (let i = 0; i <= plotSteps; i++) {
@@ -437,7 +493,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Top handle badge
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(ptX - 22, 10, 44, 24, 7);
@@ -448,7 +503,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText(`${label}=${val.toFixed(1)}`, ptX, 26);
 
-      // Center point on axis
       ctx.beginPath();
       ctx.arc(ptX, origin.cy, 7, 0, Math.PI * 2);
       ctx.fillStyle = color;
@@ -458,8 +512,8 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.stroke();
     };
 
-    drawBoundaryLine(a, 'a', '#34d399'); // Emerald
-    drawBoundaryLine(b, 'b', '#fbbf24'); // Amber
+    drawBoundaryLine(a, 'a', '#34d399');
+    drawBoundaryLine(b, 'b', '#fbbf24');
 
     // 9. Live Accumulator marker for HDI
     if (mode === 'hdi_accumulator' && xAccumulator !== undefined) {
@@ -511,7 +565,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     antiderivativeFn,
     xAccumulator,
     hoveredPoint,
-    mode
+    mode,
+    drawProgress,
+    isDrawingAnim
   ]);
 
   // Handle Dragging bounds or Pan View
@@ -529,15 +585,16 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
     if (Math.abs(clickX - ptA) < 24) {
       setDraggingMode('a');
+      sounds.playPop();
     } else if (Math.abs(clickX - ptB) < 24) {
       setDraggingMode('b');
+      sounds.playPop();
     } else if (mode === 'hdi_accumulator' && xAccumulator !== undefined) {
       const ptAcc = mathToCanvas(xAccumulator, 0, width, height).cx;
       if (Math.abs(clickX - ptAcc) < 24) {
         setDraggingMode('acc');
       }
     } else {
-      // Pan viewport
       setDraggingMode('pan');
       const mathPt = canvasToMath(clickX, clickY, width, height);
       setPanStart({
@@ -572,7 +629,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       const newAcc = parseFloat(mathPt.mx.toFixed(2));
       onUpdateAccumulator(newAcc);
     } else if (draggingMode === 'pan' && panStart) {
-      // Delta movement
       const deltaX = mathPt.mx - panStart.mx;
       const deltaY = mathPt.my - panStart.my;
       setXMin(parseFloat((panStart.xMin - deltaX).toFixed(2)));
@@ -620,8 +676,17 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         }`}
       />
 
-      {/* Floating View Controls Toolbar (Zoom, Fullscreen, Reset) */}
+      {/* Floating View Controls Toolbar (Re-Draw, Zoom, Fullscreen, Reset) */}
       <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-xl z-20">
+        <button
+          onClick={startDrawingAnimation}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/40 text-xs font-semibold hover:bg-cyan-600 hover:text-white transition-all shadow-sm"
+          title="Graph mit Leuchtpunkt neu zeichnen"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          <span>Zeichnen</span>
+        </button>
+        <div className="w-[1px] h-5 bg-slate-700 mx-1" />
         <button
           onClick={() => handleZoom(0.8)}
           className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all"

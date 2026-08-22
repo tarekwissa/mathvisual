@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { AppModule } from '../../types/math';
-import { Percent, Sigma, Trophy, BookOpen, Download, HelpCircle, Menu, X, Sparkles } from 'lucide-react';
+import { Percent, Sigma, Trophy, BookOpen, Download, HelpCircle, Menu, X, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 interface HeaderProps {
   activeModule: AppModule;
@@ -11,6 +12,7 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [isMuted, setIsMuted] = useState<boolean>(sounds.getIsMuted());
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
@@ -22,6 +24,14 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
+  const handleToggleMute = () => {
+    const nextMuted = sounds.toggleMute();
+    setIsMuted(nextMuted);
+    if (!nextMuted) {
+      sounds.playPop();
+    }
+  };
+
   const handleInstallPWA = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -29,6 +39,11 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
     if (outcome === 'accepted') {
       setInstallPrompt(null);
     }
+  };
+
+  const handleNavClick = (mod: AppModule) => {
+    sounds.playPop();
+    onSelectModule(mod);
   };
 
   const navItems = [
@@ -68,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div
-            onClick={() => onSelectModule('prozent')}
+            onClick={() => handleNavClick('prozent')}
             className="flex items-center gap-3 cursor-pointer group select-none"
           >
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-all duration-300">
@@ -97,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
               return (
                 <button
                   key={item.id}
-                  onClick={() => onSelectModule(item.id)}
+                  onClick={() => handleNavClick(item.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive
                       ? 'bg-gradient-to-r ' + item.color + ' text-white shadow-lg'
@@ -113,6 +128,19 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
 
           {/* Action buttons */}
           <div className="flex items-center gap-2">
+            {/* Sound Toggle Button */}
+            <button
+              onClick={handleToggleMute}
+              className={`p-2.5 rounded-xl border transition-all ${
+                isMuted
+                  ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                  : 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 shadow-sm hover:bg-indigo-600 hover:text-white'
+              }`}
+              title={isMuted ? 'Soundeffekte aktivieren' : 'Soundeffekte stummschalten'}
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+
             {/* PWA Install Button */}
             {installPrompt && (
               <button
@@ -126,7 +154,10 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
 
             {/* Info / About Modal trigger */}
             <button
-              onClick={() => setShowInfoModal(true)}
+              onClick={() => {
+                sounds.playPop();
+                setShowInfoModal(true);
+              }}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               title="Über MatheVisual"
             >
@@ -154,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
               <button
                 key={item.id}
                 onClick={() => {
-                  onSelectModule(item.id);
+                  handleNavClick(item.id);
                   setMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
@@ -198,9 +229,9 @@ export const Header: React.FC<HeaderProps> = ({ activeModule, onSelectModule }) 
             </p>
 
             <ul className="text-xs text-slate-300 space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800 list-disc list-inside">
-              <li><strong>Prozentrechnung:</strong> Magisches Dreieck, 100er-Waffelgitter, 3-Schritte-Dreisatz und echte Alltagsszenarien (Rabatt, Mehrwertsteuer, Trinkgeld).</li>
-              <li><strong>Integralrechnung:</strong> Interaktive Kurvenflächen, Riemann-Summen mit variabler Streifenanzahl, HDI und Flächen zwischen Kurven.</li>
-              <li><strong>Quiz & Challenge:</strong> Gamifizierter Wissenstrainer mit Streaks, Konfetti und Erklärungen.</li>
+              <li><strong>Prozentrechnung:</strong> Füllstands-Labor mit echten Wellen, 100-Häppchen-Schneider, Pizza-Teiler und Schätz-Augenmaß.</li>
+              <li><strong>Integralrechnung:</strong> Animierter Kurvenzeichner mit Leuchtpunkt-Fahrt, Vollbild, Zoom & Pan, Riemann-Summen und Flächen.</li>
+              <li><strong>Sound-Effekte:</strong> Lebendige Audio-Synthese für Wasser, Schneiden, Erfolge und Graphen-Spur.</li>
               <li><strong>Offline-Fähigkeit:</strong> Funktioniert komplett ohne Internet als Progressive Web App (PWA).</li>
             </ul>
 
