@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { RiemannRectangle } from '../../utils/mathParser';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play } from 'lucide-react';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play, Gauge } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 interface IntegralCanvasGraphProps {
@@ -46,17 +46,13 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   const [yMin, setYMin] = useState<number>(-3);
   const [yMax, setYMax] = useState<number>(6);
 
-  // Drawing Animation (Point travelling along graph)
+  // Drawing Animation (Point travelling slowly along graph with glowing comet trail)
   const [drawProgress, setDrawProgress] = useState<number>(1); // 0 to 1
   const [isDrawingAnim, setIsDrawingAnim] = useState<boolean>(false);
+  const [drawSpeed, setDrawSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
   const animFrameRef = useRef<number | null>(null);
 
-  // Dragging / Pan state
-  const [draggingMode, setDraggingMode] = useState<'a' | 'b' | 'acc' | 'pan' | null>(null);
-  const [panStart, setPanStart] = useState<{ mx: number; my: number; xMin: number; xMax: number; yMin: number; yMax: number } | null>(null);
-  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; canvasX: number; canvasY: number } | null>(null);
-
-  // Start animated point-draw effect
+  // Start animated point-draw effect (Slower, cinematic drawing)
   const startDrawingAnimation = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -65,15 +61,16 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setDrawProgress(0);
 
     const startTime = performance.now();
-    const duration = 1200; // 1.2s smooth draw
+    // Slow: 4500ms, Normal: 3000ms, Fast: 1500ms
+    const duration = drawSpeed === 'slow' ? 4500 : drawSpeed === 'fast' ? 1500 : 3200;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(1, elapsed / duration);
       setDrawProgress(progress);
 
-      // Sound sweep
-      if (Math.random() < 0.25) {
+      // Sound sweep periodically
+      if (Math.random() < 0.18) {
         sounds.playGraphTraceSound(progress);
       }
 
@@ -86,12 +83,17 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, []);
+  }, [drawSpeed]);
 
   // Trigger draw animation when function changes
   useEffect(() => {
     startDrawingAnimation();
   }, [fn, startDrawingAnimation]);
+
+  // Dragging / Pan state
+  const [draggingMode, setDraggingMode] = useState<'a' | 'b' | 'acc' | 'pan' | null>(null);
+  const [panStart, setPanStart] = useState<{ mx: number; my: number; xMin: number; xMax: number; yMin: number; yMax: number } | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; canvasX: number; canvasY: number } | null>(null);
 
   // Auto-fit view to current integration bounds
   const handleResetView = useCallback(() => {
@@ -380,7 +382,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       });
     }
 
-    // 5. Draw Primary Function f(x) with Live Drawing Tracer Progress
+    // 5. Draw Primary Function f(x) with Live Slower Drawing Progress & Glowing Trail
     ctx.beginPath();
     ctx.lineWidth = 3.5;
     ctx.strokeStyle = '#38bdf8'; // Sky blue neon
@@ -390,6 +392,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     const dx = (xMax - xMin) / plotSteps;
     let started = false;
     let tracerPt: { cx: number; cy: number; mx: number; my: number } | null = null;
+    const trailPoints: { cx: number; cy: number }[] = [];
 
     for (let i = 0; i <= currentMaxStep; i++) {
       const x = xMin + i * dx;
@@ -403,6 +406,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         } else {
           ctx.lineTo(pt.cx, pt.cy);
         }
+        if (i >= currentMaxStep - 20) {
+          trailPoints.push(pt);
+        }
         if (i === currentMaxStep) {
           tracerPt = { cx: pt.cx, cy: pt.cy, mx: x, my: y };
         }
@@ -410,22 +416,38 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     }
     ctx.stroke();
 
+    // Glowing Comet Trail behind the tracer point
+    if (trailPoints.length > 1 && (drawProgress < 1 || isDrawingAnim)) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.lineCap = 'round';
+      ctx.moveTo(trailPoints[0].cx, trailPoints[0].cy);
+      for (let j = 1; j < trailPoints.length; j++) {
+        ctx.lineTo(trailPoints[j].cx, trailPoints[j].cy);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw the Glowing Traveling Point / Tracer Particle
     if (tracerPt && (drawProgress < 1 || isDrawingAnim)) {
       // Glow pulse
-      const glowGrad = ctx.createRadialGradient(tracerPt.cx, tracerPt.cy, 2, tracerPt.cx, tracerPt.cy, 18);
+      const glowGrad = ctx.createRadialGradient(tracerPt.cx, tracerPt.cy, 2, tracerPt.cx, tracerPt.cy, 24);
       glowGrad.addColorStop(0, 'rgba(56, 189, 248, 1)');
-      glowGrad.addColorStop(0.4, 'rgba(56, 189, 248, 0.6)');
+      glowGrad.addColorStop(0.3, 'rgba(56, 189, 248, 0.7)');
+      glowGrad.addColorStop(0.7, 'rgba(147, 51, 234, 0.4)');
       glowGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
 
       ctx.beginPath();
-      ctx.arc(tracerPt.cx, tracerPt.cy, 18, 0, Math.PI * 2);
+      ctx.arc(tracerPt.cx, tracerPt.cy, 24, 0, Math.PI * 2);
       ctx.fillStyle = glowGrad;
       ctx.fill();
 
       // Sharp center core
       ctx.beginPath();
-      ctx.arc(tracerPt.cx, tracerPt.cy, 5, 0, Math.PI * 2);
+      ctx.arc(tracerPt.cx, tracerPt.cy, 6, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
     }
@@ -676,17 +698,35 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         }`}
       />
 
-      {/* Floating View Controls Toolbar (Re-Draw, Zoom, Fullscreen, Reset) */}
-      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-xl z-20">
+      {/* Floating View Controls Toolbar */}
+      <div className="absolute top-4 right-4 flex flex-wrap items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/80 shadow-xl z-20">
+        {/* Draw Replay Button */}
         <button
           onClick={startDrawingAnimation}
           className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/40 text-xs font-semibold hover:bg-cyan-600 hover:text-white transition-all shadow-sm"
-          title="Graph mit Leuchtpunkt neu zeichnen"
+          title="Graph mit Leuchtpunkt und Schweif langsam neu zeichnen"
         >
           <Play className="w-3.5 h-3.5 fill-current" />
-          <span>Zeichnen</span>
+          <span>Neu zeichnen</span>
         </button>
-        <div className="w-[1px] h-5 bg-slate-700 mx-1" />
+
+        {/* Speed toggle */}
+        <button
+          onClick={() => {
+            sounds.playPop();
+            const nextSpeed = drawSpeed === 'normal' ? 'slow' : drawSpeed === 'slow' ? 'fast' : 'normal';
+            setDrawSpeed(nextSpeed);
+          }}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-mono transition-all"
+          title="Zeichen-Geschwindigkeit umschalten"
+        >
+          <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+          <span>{drawSpeed === 'slow' ? 'Langsam (4.5s)' : drawSpeed === 'fast' ? 'Schnell (1.5s)' : 'Gemächlich (3.2s)'}</span>
+        </button>
+
+        <div className="w-[1px] h-5 bg-slate-700 mx-1 hidden sm:block" />
+
+        {/* Zoom In/Out & Reset */}
         <button
           onClick={() => handleZoom(0.8)}
           className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all"
@@ -708,7 +748,10 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
+
         <div className="w-[1px] h-5 bg-slate-700 mx-1" />
+
+        {/* Fullscreen */}
         <button
           onClick={toggleFullscreen}
           className={`p-2 rounded-xl transition-all ${
