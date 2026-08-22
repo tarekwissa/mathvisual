@@ -3,6 +3,7 @@ import { IntegralCanvasGraph } from './IntegralCanvasGraph';
 import { IntegralRiemannExplainer } from './IntegralRiemannExplainer';
 import { IntegralStepByStep } from './IntegralStepByStep';
 import { IntegralTwoFunctions } from './IntegralTwoFunctions';
+import { IntegralCustomFunctionModal } from './IntegralCustomFunctionModal';
 import {
   PRESET_FUNCTIONS,
   compileMathExpression,
@@ -10,9 +11,8 @@ import {
   computeRiemannSum,
   findRootsInInterval
 } from '../../utils/mathParser';
-import type { PresetFunction } from '../../types/math';
 import { MathRenderer } from '../common/MathRenderer';
-import { Activity, Layers, Sparkles, Sigma, Eye, Plus, Minus } from 'lucide-react';
+import { Layers, Sigma, Plus, Minus, Edit3, ChevronDown } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const IntegralExplorer: React.FC = () => {
@@ -20,6 +20,7 @@ export const IntegralExplorer: React.FC = () => {
   const [selectedPresetId, setSelectedPresetId] = useState<string>('quad_standard');
   const [customExpr, setCustomExpr] = useState<string>('x^2');
   const [isCustom, setIsCustom] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Second function expression for between mode
   const [secondExpr, setSecondExpr] = useState<string>('x');
@@ -39,14 +40,27 @@ export const IntegralExplorer: React.FC = () => {
   const [xAccumulator, setXAccumulator] = useState<number>(1.5);
 
   const currentPreset = useMemo(() => {
-    return PRESET_FUNCTIONS.find(p => p.id === selectedPresetId);
+    return PRESET_FUNCTIONS.find((p) => p.id === selectedPresetId);
   }, [selectedPresetId]);
 
   // Active expression string
   const activeExpression = isCustom ? customExpr : (currentPreset?.expression || 'x^2');
 
+  // Formatted LaTeX for active function
+  const activeLatex = useMemo(() => {
+    if (!isCustom && currentPreset) return currentPreset.latex;
+    return activeExpression
+      .replace(/\*/g, ' \\cdot ')
+      .replace(/sqrt\((.*?)\)/g, '\\sqrt{$1}')
+      .replace(/sin\((.*?)\)/g, '\\sin($1)')
+      .replace(/cos\((.*?)\)/g, '\\cos($1)')
+      .replace(/tan\((.*?)\)/g, '\\tan($1)')
+      .replace(/exp\((.*?)\)/g, 'e^{$1}')
+      .replace(/ln\((.*?)\)/g, '\\ln($1)');
+  }, [activeExpression, isCustom, currentPreset]);
+
   // Compiled functions
-  const { fn: primaryFn, isValid: isPrimaryValid, errorMessage } = useMemo(() => {
+  const { fn: primaryFn, isValid: isPrimaryValid } = useMemo(() => {
     return compileMathExpression(activeExpression);
   }, [activeExpression]);
 
@@ -88,13 +102,20 @@ export const IntegralExplorer: React.FC = () => {
     return (x: number) => computeDefiniteIntegral(primaryFn, a, x, false, 50);
   }, [primaryFn, a]);
 
-  const handleSelectPreset = (preset: PresetFunction) => {
+  const handleSelectPresetDropdown = (presetId: string) => {
     sounds.playPop();
+    const preset = PRESET_FUNCTIONS.find((p) => p.id === presetId);
+    if (!preset) return;
     setSelectedPresetId(preset.id);
     setIsCustom(false);
     setCustomExpr(preset.expression);
     setA(preset.defaultA);
     setB(preset.defaultB);
+  };
+
+  const handleApplyCustomFunction = (newExpr: string) => {
+    setIsCustom(true);
+    setCustomExpr(newExpr);
   };
 
   const handleSetTwoFunctionsPreset = (f: string, g: string, newA: number, newB: number) => {
@@ -116,111 +137,113 @@ export const IntegralExplorer: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/20 p-8 shadow-2xl">
+      {/* Hero Banner with Sleek Dropdown & Custom Function Button */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/20 p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-4">
-            <Sigma className="w-4 h-4 text-cyan-400" />
-            Analysis & Kurvenintegral
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-2">
+              <Sigma className="w-4 h-4 text-cyan-400" />
+              Analysis & Kurvenintegral
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Der Integral-Visualizer
+            </h1>
+            <p className="mt-1 text-slate-300 max-w-2xl text-xs sm:text-sm leading-relaxed">
+              Untersuche Flächen unter Kurven, experimentiere mit Riemann-Summen und gib eigene Funktionen ein!
+            </p>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Der Integral-Visualizer
-          </h1>
-          <p className="mt-2 text-slate-300 max-w-3xl text-sm sm:text-base leading-relaxed">
-            Verstehe die Integralrechnung intuitiv: Untersuche, wie Flächen unter Kurven entstehen, experimentiere mit <strong>Riemann-Summen</strong> und bestimme die <strong>Anzahl der Rechtecke</strong> frei!
-          </p>
 
-          {/* Quick Preset Function Selector Pills */}
-          <div className="mt-6">
-            <span className="text-xs font-mono uppercase text-slate-400 block mb-2 font-semibold">
+          {/* Active Formula Live LaTeX Badge */}
+          <div className="bg-slate-950/90 border border-cyan-500/40 px-5 py-3 rounded-2xl text-center shadow-lg">
+            <span className="text-[10px] uppercase font-mono text-slate-400 block font-semibold">Aktuelle Funktion:</span>
+            <div className="text-xl font-extrabold text-cyan-300 mt-0.5">
+              <MathRenderer latex={`f(x) = ${activeLatex}`} />
+            </div>
+          </div>
+        </div>
+
+        {/* Function Selection Bar: Dropdown + Custom Button */}
+        <div className="relative z-10 p-4 bg-slate-950/90 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="flex flex-1 items-center gap-3">
+            <span className="text-xs text-slate-400 font-mono font-semibold whitespace-nowrap">
               Funktion wählen:
             </span>
-            <div className="flex flex-wrap gap-2">
-              {PRESET_FUNCTIONS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleSelectPreset(p)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all flex items-center gap-2 ${
-                    !isCustom && selectedPresetId === p.id
-                      ? 'bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-600/30'
-                      : 'bg-slate-900/80 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <span className="font-bold">{p.name}</span>
-                  <span className="font-mono text-[11px] opacity-75">({p.latex})</span>
-                </button>
-              ))}
-              <button
-                onClick={() => {
-                  sounds.playPop();
-                  setIsCustom(true);
+
+            {/* Modern Dropdown Select */}
+            <div className="relative flex-1">
+              <select
+                value={isCustom ? 'custom' : selectedPresetId}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setIsModalOpen(true);
+                  } else {
+                    handleSelectPresetDropdown(e.target.value);
+                  }
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all ${
-                  isCustom
-                    ? 'bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-600/30'
-                    : 'bg-slate-900/80 border-slate-700 text-slate-300 hover:bg-slate-800'
-                }`}
+                className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-4 py-2.5 pr-10 text-white font-mono text-xs sm:text-sm font-semibold focus:outline-none focus:border-cyan-400 cursor-pointer transition-all shadow-inner"
               >
-                ✏️ Eigene Formel eingeben
-              </button>
+                <optgroup label="Bekannte Standard-Funktionen">
+                  {PRESET_FUNCTIONS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — f(x) = {p.expression}
+                    </option>
+                  ))}
+                </optgroup>
+                {isCustom && (
+                  <optgroup label="Benutzerdefiniert">
+                    <option value="custom">✨ Eigene Formel: f(x) = {customExpr}</option>
+                  </optgroup>
+                )}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
             </div>
           </div>
 
-          {/* Custom Formula Editor if active */}
-          {isCustom && (
-            <div className="mt-4 p-4 bg-slate-950/80 rounded-2xl border border-slate-800 flex flex-col sm:flex-row gap-3 items-center">
-              <div className="flex-1 w-full">
-                <label className="text-xs font-mono text-cyan-400 block mb-1">
-                  f(x) Formel eingeben (z.B. x^3 - 2*x, sin(x), 2*exp(x)):
-                </label>
-                <input
-                  type="text"
-                  value={customExpr}
-                  onChange={(e) => setCustomExpr(e.target.value)}
-                  placeholder="z.B. x^2 - 4"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white font-mono text-sm focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-              {!isPrimaryValid && (
-                <div className="text-xs text-rose-400 font-mono self-end sm:self-center">
-                  ⚠️ {errorMessage}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Button for Custom Function Modal */}
+          <button
+            onClick={() => {
+              sounds.playPop();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/30 transition-all shrink-0"
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Eigene Funktion eingeben</span>
+          </button>
         </div>
       </div>
 
-      {/* Mode Switcher Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
-        {[
-          { id: 'single', label: '1. Fläche unter f(x)', icon: Activity },
-          { id: 'riemann', label: '2. Riemann-Summen (Rechtecks-Labor)', icon: Layers },
-          { id: 'between', label: '3. Fläche zwischen zwei Graphen', icon: Sparkles },
-          { id: 'hdi_accumulator', label: '4. Stammfunktion & Hauptsatz (HDI)', icon: Eye }
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeMode === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
+      {/* Mode Switcher Dropdown / Segment Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 font-mono">Modus:</span>
+          <div className="relative">
+            <select
+              value={activeMode}
+              onChange={(e) => {
                 sounds.playPop();
-                setActiveMode(tab.id as any);
+                setActiveMode(e.target.value as any);
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                isActive
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
-                  : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
+              className="appearance-none bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-3.5 py-2 pr-9 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-cyan-400 cursor-pointer transition-all"
             >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
+              <option value="single">1. Fläche unter f(x)</option>
+              <option value="riemann">2. Riemann-Summen (Rechtecks-Labor)</option>
+              <option value="between">3. Fläche zwischen zwei Graphen</option>
+              <option value="hdi_accumulator">4. Stammfunktion & Hauptsatz (HDI)</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Quick hint */}
+        <span className="text-[11px] text-slate-500 font-mono">
+          {activeMode === 'single' && 'Standard-Kurvenintegral & Flächenberechnung'}
+          {activeMode === 'riemann' && 'Approximation mit verstellbaren Rechtecken'}
+          {activeMode === 'between' && 'Fläche zwischen f(x) und g(x)'}
+          {activeMode === 'hdi_accumulator' && 'Hauptsatz: F\'(x) = f(x)'}
+        </span>
       </div>
 
       {/* Direct Riemann Rectangle Controller in Riemann Mode */}
@@ -306,30 +329,25 @@ export const IntegralExplorer: React.FC = () => {
             </div>
           </div>
 
-          {/* Riemann Type Picker (Method) */}
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-800">
-            <span className="text-xs text-slate-400 font-mono self-center mr-2">Methode:</span>
-            {[
-              { id: 'left', label: 'Links-Summe' },
-              { id: 'right', label: 'Rechts-Summe' },
-              { id: 'midpoint', label: 'Mittelpunkt-Summe' },
-              { id: 'trapezoid', label: 'Trapez-Regel' }
-            ].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
+          {/* Riemann Type Picker Dropdown / Bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
+            <span className="text-xs text-slate-400 font-mono mr-1">Methode:</span>
+            <div className="relative">
+              <select
+                value={riemannType}
+                onChange={(e) => {
                   sounds.playPop();
-                  setRiemannType(m.id as any);
+                  setRiemannType(e.target.value as any);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  riemannType === m.id
-                    ? 'bg-indigo-600 border-indigo-400 text-white shadow'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                }`}
+                className="appearance-none bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
               >
-                {m.label}
-              </button>
-            ))}
+                <option value="left">Links-Summe</option>
+                <option value="right">Rechts-Summe</option>
+                <option value="midpoint">Mittelpunkt-Summe</option>
+                <option value="trapezoid">Trapez-Regel</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+            </div>
           </div>
         </div>
       )}
@@ -372,32 +390,25 @@ export const IntegralExplorer: React.FC = () => {
             />
           </div>
 
-          {/* Area Type Toggle (Signed vs Absolute) */}
+          {/* Area Type Dropdown (Signed vs Absolute) */}
           <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-mono block">Flächen-Interpretation:</label>
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
-              <button
-                onClick={() => setAreaType('signed')}
-                className={`flex-1 py-1 rounded-lg transition-all ${
-                  areaType === 'signed' ? 'bg-indigo-600 text-white' : 'text-slate-400'
-                }`}
+            <label className="text-xs text-slate-400 font-mono block">Fläche:</label>
+            <div className="relative">
+              <select
+                value={areaType}
+                onChange={(e) => setAreaType(e.target.value as any)}
+                className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-400 cursor-pointer"
               >
-                Bilanz (±)
-              </button>
-              <button
-                onClick={() => setAreaType('absolute')}
-                className={`flex-1 py-1 rounded-lg transition-all ${
-                  areaType === 'absolute' ? 'bg-indigo-600 text-white' : 'text-slate-400'
-                }`}
-              >
-                Geometrisch (|A|)
-              </button>
+                <option value="signed">Flächenbilanz (±)</option>
+                <option value="absolute">Geometrisch (|A|)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
           </div>
 
           {/* Antiderivative Toggle */}
           <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-300 font-medium">Stammfunktion F(x) einblenden</span>
+            <span className="text-xs text-slate-300 font-medium">Stammfunktion F(x)</span>
             <input
               type="checkbox"
               checked={showAntiderivative || activeMode === 'hdi_accumulator'}
@@ -531,6 +542,14 @@ export const IntegralExplorer: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Custom Function Input Modal */}
+      <IntegralCustomFunctionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        currentExpression={customExpr}
+        onApplyFunction={handleApplyCustomFunction}
+      />
     </div>
   );
 };
