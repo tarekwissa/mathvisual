@@ -12,7 +12,7 @@ import {
   findRootsInInterval
 } from '../../utils/mathParser';
 import { MathRenderer } from '../common/MathRenderer';
-import { Layers, Sigma, Plus, Minus, Edit3, ChevronDown } from 'lucide-react';
+import { Sigma, Plus, Minus, Edit3, ChevronDown } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const IntegralExplorer: React.FC = () => {
