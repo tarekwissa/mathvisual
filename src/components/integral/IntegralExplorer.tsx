@@ -1,55 +1,83 @@
 import React, { useState, useMemo } from 'react';
 import { IntegralCanvasGraph } from './IntegralCanvasGraph';
+import type { CompiledFunctionItem } from './IntegralCanvasGraph';
 import { IntegralRiemannExplainer } from './IntegralRiemannExplainer';
 import { IntegralStepByStep } from './IntegralStepByStep';
 import { IntegralTwoFunctions } from './IntegralTwoFunctions';
 import { IntegralCustomFunctionModal } from './IntegralCustomFunctionModal';
 import {
-  PRESET_FUNCTIONS,
   compileMathExpression,
   computeDefiniteIntegral,
   computeRiemannSum,
   findRootsInInterval
 } from '../../utils/mathParser';
 import { MathRenderer } from '../common/MathRenderer';
-import { Sigma, Plus, Minus, Edit3, ChevronDown } from 'lucide-react';
+import { Sigma, Plus, Minus, Edit3, Trash2, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
-export const IntegralExplorer: React.FC = () => {
-  // Active Preset & Expression
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('quad_standard');
-  const [customExpr, setCustomExpr] = useState<string>('x^2');
-  const [isCustom, setIsCustom] = useState<boolean>(false);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+const PALETTE = [
+  '#38bdf8', // Cyan
+  '#f43f5e', // Rose
+  '#10b981', // Emerald
+  '#fbbf24', // Amber
+  '#c084fc', // Purple
+  '#3b82f6', // Blue
+  '#f97316'  // Orange
+];
 
-  // Second function expression for between mode
-  const [secondExpr, setSecondExpr] = useState<string>('x');
+interface FunctionEntry {
+  id: string;
+  name: string;
+  expression: string;
+  color: string;
+  isVisible: boolean;
+}
+
+export const IntegralExplorer: React.FC = () => {
+  // Multiple functions state
+  const [functions, setFunctions] = useState<FunctionEntry[]>([
+    { id: 'f1', name: 'f₁(x)', expression: 'x^3 - 3*x', color: '#38bdf8', isVisible: true },
+    { id: 'f2', name: 'f₂(x)', expression: 'x', color: '#f43f5e', isVisible: true }
+  ]);
+
+  // Which function is the primary target for integration
+  const [primaryFunctionId, setPrimaryFunctionId] = useState<string>('f1');
+  const [secondFunctionId, setSecondFunctionId] = useState<string>('f2');
+
+  // Modal for editing/adding function
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalTargetId, setModalTargetId] = useState<string | null>(null);
 
   // Integration bounds
-  const [a, setA] = useState<number>(0);
-  const [b, setB] = useState<number>(3);
+  const [a, setA] = useState<number>(-2);
+  const [b, setB] = useState<number>(2);
 
   // Mode and view options
   const [activeMode, setActiveMode] = useState<'single' | 'riemann' | 'between' | 'hdi_accumulator'>('single');
   const [areaType, setAreaType] = useState<'signed' | 'absolute'>('signed');
   const [riemannType, setRiemannType] = useState<'left' | 'right' | 'midpoint' | 'trapezoid'>('midpoint');
-  const [riemannN, setRiemannN] = useState<number>(10);
+  const [riemannN, setRiemannN] = useState<number>(12);
   const [showAntiderivative, setShowAntiderivative] = useState<boolean>(false);
+  const [xAccumulator, setXAccumulator] = useState<number>(1.0);
 
-  // Accumulator marker for HDI
-  const [xAccumulator, setXAccumulator] = useState<number>(1.5);
+  // Compile all functions
+  const compiledFunctions: CompiledFunctionItem[] = useMemo(() => {
+    return functions.map((f) => {
+      const { fn, isValid } = compileMathExpression(f.expression);
+      return {
+        ...f,
+        fn,
+        isValid
+      };
+    });
+  }, [functions]);
 
-  const currentPreset = useMemo(() => {
-    return PRESET_FUNCTIONS.find((p) => p.id === selectedPresetId);
-  }, [selectedPresetId]);
+  const primaryItem = compiledFunctions.find((f) => f.id === primaryFunctionId) || compiledFunctions[0];
+  const secondItem = compiledFunctions.find((f) => f.id === secondFunctionId) || compiledFunctions[1];
 
-  // Active expression string
-  const activeExpression = isCustom ? customExpr : (currentPreset?.expression || 'x^2');
-
-  // Formatted LaTeX for active function
-  const activeLatex = useMemo(() => {
-    if (!isCustom && currentPreset) return currentPreset.latex;
-    return activeExpression
+  // Helper to format LaTeX
+  const formatLatex = (expr: string) => {
+    return expr
       .replace(/\*/g, ' \\cdot ')
       .replace(/sqrt\((.*?)\)/g, '\\sqrt{$1}')
       .replace(/sin\((.*?)\)/g, '\\sin($1)')
@@ -57,74 +85,95 @@ export const IntegralExplorer: React.FC = () => {
       .replace(/tan\((.*?)\)/g, '\\tan($1)')
       .replace(/exp\((.*?)\)/g, 'e^{$1}')
       .replace(/ln\((.*?)\)/g, '\\ln($1)');
-  }, [activeExpression, isCustom, currentPreset]);
-
-  // Compiled functions
-  const { fn: primaryFn, isValid: isPrimaryValid } = useMemo(() => {
-    return compileMathExpression(activeExpression);
-  }, [activeExpression]);
-
-  const { fn: secondFn } = useMemo(() => {
-    return compileMathExpression(secondExpr);
-  }, [secondExpr]);
+  };
 
   // Numerical evaluations
   const signedIntegral = useMemo(() => {
-    if (!isPrimaryValid) return 0;
-    return computeDefiniteIntegral(primaryFn, a, b, false);
-  }, [primaryFn, isPrimaryValid, a, b]);
+    if (!primaryItem || !primaryItem.isValid) return 0;
+    return computeDefiniteIntegral(primaryItem.fn, a, b, false);
+  }, [primaryItem, a, b]);
 
   const absoluteArea = useMemo(() => {
-    if (!isPrimaryValid) return 0;
-    return computeDefiniteIntegral(primaryFn, a, b, true);
-  }, [primaryFn, isPrimaryValid, a, b]);
+    if (!primaryItem || !primaryItem.isValid) return 0;
+    return computeDefiniteIntegral(primaryItem.fn, a, b, true);
+  }, [primaryItem, a, b]);
 
   const areaBetween = useMemo(() => {
-    if (!isPrimaryValid) return 0;
-    const diffFn = (x: number) => primaryFn(x) - secondFn(x);
+    if (!primaryItem || !primaryItem.isValid || !secondItem || !secondItem.isValid) return 0;
+    const diffFn = (x: number) => primaryItem.fn(x) - secondItem.fn(x);
     return computeDefiniteIntegral(diffFn, a, b, false);
-  }, [primaryFn, secondFn, isPrimaryValid, a, b]);
+  }, [primaryItem, secondItem, a, b]);
 
   // Riemann sums
   const { totalSum: riemannSum, rectangles: riemannRectangles } = useMemo(() => {
-    if (!isPrimaryValid || activeMode !== 'riemann') return { totalSum: 0, rectangles: [] };
-    return computeRiemannSum(primaryFn, a, b, riemannN, riemannType);
-  }, [primaryFn, isPrimaryValid, a, b, riemannN, riemannType, activeMode]);
+    if (!primaryItem || !primaryItem.isValid || activeMode !== 'riemann') return { totalSum: 0, rectangles: [] };
+    return computeRiemannSum(primaryItem.fn, a, b, riemannN, riemannType);
+  }, [primaryItem, a, b, riemannN, riemannType, activeMode]);
 
-  // Roots in interval for absolute area
+  // Roots in interval
   const roots = useMemo(() => {
-    if (!isPrimaryValid) return [];
-    return findRootsInInterval(primaryFn, a, b);
-  }, [primaryFn, isPrimaryValid, a, b]);
+    if (!primaryItem || !primaryItem.isValid) return [];
+    return findRootsInInterval(primaryItem.fn, a, b);
+  }, [primaryItem, a, b]);
 
-  // Simple numeric antiderivative approximation for graphing F(x)
+  // Numeric antiderivative
   const antiderivativeFn = useMemo(() => {
-    return (x: number) => computeDefiniteIntegral(primaryFn, a, x, false, 50);
-  }, [primaryFn, a]);
+    if (!primaryItem || !primaryItem.isValid) return undefined;
+    return (x: number) => computeDefiniteIntegral(primaryItem.fn, a, x, false, 50);
+  }, [primaryItem, a]);
 
-  const handleSelectPresetDropdown = (presetId: string) => {
+  // Remove function
+  const handleRemoveFunction = (id: string) => {
+    if (functions.length <= 1) return;
     sounds.playPop();
-    const preset = PRESET_FUNCTIONS.find((p) => p.id === presetId);
-    if (!preset) return;
-    setSelectedPresetId(preset.id);
-    setIsCustom(false);
-    setCustomExpr(preset.expression);
-    setA(preset.defaultA);
-    setB(preset.defaultB);
+    const updated = functions.filter((f) => f.id !== id);
+    setFunctions(updated);
+    if (primaryFunctionId === id) {
+      setPrimaryFunctionId(updated[0].id);
+    }
+    if (secondFunctionId === id) {
+      setSecondFunctionId(updated[1]?.id || updated[0].id);
+    }
   };
 
-  const handleApplyCustomFunction = (newExpr: string) => {
-    setIsCustom(true);
-    setCustomExpr(newExpr);
+  // Toggle visibility
+  const handleToggleVisibility = (id: string) => {
+    sounds.playPop();
+    setFunctions(
+      functions.map((f) => (f.id === id ? { ...f, isVisible: !f.isVisible } : f))
+    );
   };
 
-  const handleSetTwoFunctionsPreset = (f: string, g: string, newA: number, newB: number) => {
+  // Update expression directly
+  const handleUpdateExpression = (id: string, expr: string) => {
+    setFunctions(
+      functions.map((f) => (f.id === id ? { ...f, expression: expr } : f))
+    );
+  };
+
+  // Open modal for editing
+  const handleOpenModal = (id?: string) => {
     sounds.playPop();
-    setIsCustom(true);
-    setCustomExpr(f);
-    setSecondExpr(g);
-    setA(newA);
-    setB(newB);
+    setModalTargetId(id || null);
+    setIsModalOpen(true);
+  };
+
+  const handleApplyModalFunction = (newExpr: string) => {
+    if (modalTargetId) {
+      handleUpdateExpression(modalTargetId, newExpr);
+    } else {
+      // Add as new function
+      const nextIdx = functions.length + 1;
+      const color = PALETTE[(nextIdx - 1) % PALETTE.length];
+      const newFunc: FunctionEntry = {
+        id: `f_${Date.now()}`,
+        name: `f${nextIdx}(x)`,
+        expression: newExpr,
+        color,
+        isVisible: true
+      };
+      setFunctions([...functions, newFunc]);
+    }
   };
 
   const handleUpdateN = (newN: number) => {
@@ -137,7 +186,7 @@ export const IntegralExplorer: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Hero Banner with Sleek Dropdown & Custom Function Button */}
+      {/* Hero Banner with Multi-Function Manager */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-950 border border-indigo-500/20 p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -145,105 +194,168 @@ export const IntegralExplorer: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-2">
               <Sigma className="w-4 h-4 text-cyan-400" />
-              Analysis & Kurvenintegral
+              Multi-Funktions-Labor
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Der Integral-Visualizer
             </h1>
             <p className="mt-1 text-slate-300 max-w-2xl text-xs sm:text-sm leading-relaxed">
-              Untersuche Flächen unter Kurven, experimentiere mit Riemann-Summen und gib eigene Funktionen ein!
+              Gib <strong>mehrere beliebige Funktionen</strong> ein! Jede Kurve erhält ihre eigene Farbe und wird direkt als <strong>formatiertes LaTeX</strong> angezeigt.
             </p>
           </div>
 
-          {/* Active Formula Live LaTeX Badge */}
-          <div className="bg-slate-950/90 border border-cyan-500/40 px-5 py-3 rounded-2xl text-center shadow-lg">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block font-semibold">Aktuelle Funktion:</span>
-            <div className="text-xl font-extrabold text-cyan-300 mt-0.5">
-              <MathRenderer latex={`f(x) = ${activeLatex}`} />
-            </div>
-          </div>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-extrabold shadow-lg shadow-cyan-600/30 transition-all shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Neue Funktion hinzufügen</span>
+          </button>
         </div>
 
-        {/* Function Selection Bar: Dropdown + Custom Button */}
-        <div className="relative z-10 p-4 bg-slate-950/90 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex flex-1 items-center gap-3">
-            <span className="text-xs text-slate-400 font-mono font-semibold whitespace-nowrap">
-              Funktion wählen:
-            </span>
-
-            {/* Modern Dropdown Select */}
-            <div className="relative flex-1">
-              <select
-                value={isCustom ? 'custom' : selectedPresetId}
-                onChange={(e) => {
-                  if (e.target.value === 'custom') {
-                    setIsModalOpen(true);
-                  } else {
-                    handleSelectPresetDropdown(e.target.value);
-                  }
-                }}
-                className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-4 py-2.5 pr-10 text-white font-mono text-xs sm:text-sm font-semibold focus:outline-none focus:border-cyan-400 cursor-pointer transition-all shadow-inner"
-              >
-                <optgroup label="Bekannte Standard-Funktionen">
-                  {PRESET_FUNCTIONS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — f(x) = {p.expression}
-                    </option>
-                  ))}
-                </optgroup>
-                {isCustom && (
-                  <optgroup label="Benutzerdefiniert">
-                    <option value="custom">✨ Eigene Formel: f(x) = {customExpr}</option>
-                  </optgroup>
-                )}
-              </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
-            </div>
+        {/* Multi-Function Cards List */}
+        <div className="relative z-10 space-y-2.5">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono font-semibold">
+            <span>Deine aktiven Funktionen ({functions.length}):</span>
+            <span>Klicke in das Textfeld, um Formeln direkt zu ändern</span>
           </div>
 
-          {/* Button for Custom Function Modal */}
-          <button
-            onClick={() => {
-              sounds.playPop();
-              setIsModalOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/30 transition-all shrink-0"
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Eigene Funktion eingeben</span>
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {functions.map((func) => (
+              <div
+                key={func.id}
+                className="p-3.5 bg-slate-950/90 rounded-2xl border border-slate-800/90 hover:border-slate-700 transition-all space-y-2 relative"
+                style={{ borderLeftColor: func.color, borderLeftWidth: '4px' }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  {/* Name badge */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                      style={{ backgroundColor: func.color }}
+                    />
+                    <span className="font-bold text-white text-xs font-mono">
+                      {func.name}:
+                    </span>
+                  </div>
+
+                  {/* Right Actions: Modal Edit, Visibility, Delete */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenModal(func.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                      title="Im Formel-Fenster mit Live-LaTeX bearbeiten"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleToggleVisibility(func.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                      title={func.isVisible ? 'Kurve ausblenden' : 'Kurve einblenden'}
+                    >
+                      {func.isVisible ? <Eye className="w-3.5 h-3.5 text-cyan-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-600" />}
+                    </button>
+                    {functions.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveFunction(func.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800"
+                        title="Funktion löschen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Direct Text Input */}
+                <input
+                  type="text"
+                  value={func.expression}
+                  onChange={(e) => handleUpdateExpression(func.id, e.target.value)}
+                  placeholder="z.B. x^2 - 3"
+                  className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-cyan-400"
+                />
+
+                {/* Immediate LaTeX Display Badge */}
+                <div className="px-2.5 py-1 bg-slate-900 rounded-lg border border-slate-800 text-center text-xs font-bold truncate" style={{ color: func.color }}>
+                  <MathRenderer latex={`${func.name} = ${formatLatex(func.expression)}`} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Mode Switcher Dropdown / Segment Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-mono">Modus:</span>
-          <div className="relative">
-            <select
-              value={activeMode}
-              onChange={(e) => {
-                sounds.playPop();
-                setActiveMode(e.target.value as any);
-              }}
-              className="appearance-none bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-3.5 py-2 pr-9 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-cyan-400 cursor-pointer transition-all"
-            >
-              <option value="single">1. Fläche unter f(x)</option>
-              <option value="riemann">2. Riemann-Summen (Rechtecks-Labor)</option>
-              <option value="between">3. Fläche zwischen zwei Graphen</option>
-              <option value="hdi_accumulator">4. Stammfunktion & Hauptsatz (HDI)</option>
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+      {/* Integration Settings & Target Selector */}
+      <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+          {/* Mode Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Berechnungs-Modus:</span>
+            <div className="relative">
+              <select
+                value={activeMode}
+                onChange={(e) => {
+                  sounds.playPop();
+                  setActiveMode(e.target.value as any);
+                }}
+                className="appearance-none bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-white font-bold focus:outline-none focus:border-cyan-400 cursor-pointer"
+              >
+                <option value="single">1. Fläche unter Funktion</option>
+                <option value="riemann">2. Riemann-Summen (Streifen)</option>
+                <option value="between">3. Fläche zwischen 2 Graphen</option>
+                <option value="hdi_accumulator">4. Stammfunktion (HDI)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+            </div>
           </div>
-        </div>
 
-        {/* Quick hint */}
-        <span className="text-[11px] text-slate-500 font-mono">
-          {activeMode === 'single' && 'Standard-Kurvenintegral & Flächenberechnung'}
-          {activeMode === 'riemann' && 'Approximation mit verstellbaren Rechtecken'}
-          {activeMode === 'between' && 'Fläche zwischen f(x) und g(x)'}
-          {activeMode === 'hdi_accumulator' && 'Hauptsatz: F\'(x) = f(x)'}
-        </span>
+          {/* Primary Function Picker for Integration */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Haupt-Funktion:</span>
+            <div className="relative">
+              <select
+                value={primaryFunctionId}
+                onChange={(e) => {
+                  sounds.playPop();
+                  setPrimaryFunctionId(e.target.value);
+                }}
+                className="appearance-none bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-cyan-300 font-bold focus:outline-none focus:border-cyan-400 cursor-pointer"
+              >
+                {functions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.expression})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Second Function Picker for Between Mode */}
+          {activeMode === 'between' && functions.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Zweite Funktion:</span>
+              <div className="relative">
+                <select
+                  value={secondFunctionId}
+                  onChange={(e) => {
+                    sounds.playPop();
+                    setSecondFunctionId(e.target.value);
+                  }}
+                  className="appearance-none bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-rose-300 font-bold focus:outline-none focus:border-rose-400 cursor-pointer"
+                >
+                  {functions.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.expression})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Direct Riemann Rectangle Controller in Riemann Mode */}
@@ -329,7 +441,7 @@ export const IntegralExplorer: React.FC = () => {
             </div>
           </div>
 
-          {/* Riemann Type Picker Dropdown / Bar */}
+          {/* Riemann Type Picker */}
           <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
             <span className="text-xs text-slate-400 font-mono mr-1">Methode:</span>
             <div className="relative">
@@ -418,10 +530,11 @@ export const IntegralExplorer: React.FC = () => {
           </div>
         </div>
 
-        {/* The Live Interactive Graph */}
+        {/* The Live Multi-Function Canvas Graph */}
         <IntegralCanvasGraph
-          fn={primaryFn}
-          secondFn={secondFn}
+          functionsList={compiledFunctions}
+          primaryFunctionId={primaryFunctionId}
+          secondFunctionId={secondFunctionId}
           a={a}
           b={b}
           onUpdateBounds={(newA, newB) => {
@@ -444,7 +557,7 @@ export const IntegralExplorer: React.FC = () => {
             <div>
               <span className="text-xs text-slate-400 uppercase font-mono block">Integralausdruck:</span>
               <div className="text-base font-bold text-cyan-300 mt-0.5">
-                <MathRenderer latex={`\\int_{${a}}^{${b}} (${activeExpression}) \\, dx`} />
+                <MathRenderer latex={`\\int_{${a}}^{${b}} (${formatLatex(primaryItem?.expression || '0')}) \\, dx`} />
               </div>
             </div>
           </div>
@@ -463,10 +576,10 @@ export const IntegralExplorer: React.FC = () => {
           <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-between">
             <div>
               <span className="text-xs text-cyan-400 uppercase font-mono block">
-                {activeMode === 'riemann' ? 'Exaktes Integral:' : 'Geometrischer Flächeninhalt:'}
+                {activeMode === 'riemann' ? 'Exaktes Integral:' : activeMode === 'between' ? 'Fläche zwischen Graphen:' : 'Geometrische Fläche:'}
               </span>
               <div className="text-2xl font-extrabold font-mono text-cyan-400 mt-0.5">
-                {activeMode === 'riemann' ? signedIntegral.toFixed(4) : `${absoluteArea.toFixed(4)} FE`}
+                {activeMode === 'riemann' ? signedIntegral.toFixed(4) : activeMode === 'between' ? `${Math.abs(areaBetween).toFixed(4)} FE` : `${absoluteArea.toFixed(4)} FE`}
               </div>
             </div>
           </div>
@@ -488,22 +601,26 @@ export const IntegralExplorer: React.FC = () => {
           />
         )}
 
-        {activeMode === 'between' && (
+        {activeMode === 'between' && primaryItem && secondItem && (
           <IntegralTwoFunctions
-            fStr={activeExpression}
-            gStr={secondExpr}
-            onUpdateG={setSecondExpr}
+            fStr={primaryItem.expression}
+            gStr={secondItem.expression}
+            onUpdateG={(newG) => handleUpdateExpression(secondItem.id, newG)}
             areaBetween={areaBetween}
             a={a}
             b={b}
-            onSetPreset={handleSetTwoFunctionsPreset}
+            onSetPreset={(f, g, newA, newB) => {
+              handleUpdateExpression(primaryItem.id, f);
+              handleUpdateExpression(secondItem.id, g);
+              setA(newA);
+              setB(newB);
+            }}
           />
         )}
 
-        {activeMode === 'single' && (
+        {activeMode === 'single' && primaryItem && (
           <IntegralStepByStep
-            currentPreset={currentPreset}
-            functionString={activeExpression}
+            functionString={primaryItem.expression}
             a={a}
             b={b}
             signedIntegral={signedIntegral}
@@ -512,7 +629,7 @@ export const IntegralExplorer: React.FC = () => {
           />
         )}
 
-        {activeMode === 'hdi_accumulator' && (
+        {activeMode === 'hdi_accumulator' && primaryItem && (
           <div className="bg-slate-900/80 backdrop-blur border border-purple-500/30 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2">
               <span className="p-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-semibold uppercase tracking-wider">
@@ -527,7 +644,7 @@ export const IntegralExplorer: React.FC = () => {
             <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
               <div className="flex justify-between text-xs font-mono text-purple-300">
                 <span>Aktuelle Position x: {xAccumulator.toFixed(2)}</span>
-                <span>Aufsummierte Fläche A(x) = {computeDefiniteIntegral(primaryFn, a, xAccumulator, false).toFixed(4)}</span>
+                <span>Aufsummierte Fläche A(x) = {computeDefiniteIntegral(primaryItem.fn, a, xAccumulator, false).toFixed(4)}</span>
               </div>
               <input
                 type="range"
@@ -547,8 +664,8 @@ export const IntegralExplorer: React.FC = () => {
       <IntegralCustomFunctionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        currentExpression={customExpr}
-        onApplyFunction={handleApplyCustomFunction}
+        currentExpression={modalTargetId ? functions.find((f) => f.id === modalTargetId)?.expression || 'x^2' : 'x^2 - 2'}
+        onApplyFunction={handleApplyModalFunction}
       />
     </div>
   );

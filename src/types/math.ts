@@ -9,6 +9,14 @@ export interface PercentState {
 
 export type RiemannType = 'left' | 'right' | 'midpoint' | 'trapezoid' | 'none';
 
+export interface PlottedFunction {
+  id: string;
+  name: string;
+  expression: string;
+  color: string;
+  isVisible: boolean;
+}
+
 export interface IntegralConfig {
   functionString: string;
   secondFunctionString?: string;
