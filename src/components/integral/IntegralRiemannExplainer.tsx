@@ -1,6 +1,7 @@
 import React from 'react';
 import { MathRenderer } from '../common/MathRenderer';
-import { Sparkles, Layers } from 'lucide-react';
+import { Sparkles, Layers, Plus, Minus } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 interface IntegralRiemannExplainerProps {
   exactIntegral: number;
@@ -25,7 +26,17 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
 }) => {
   const error = Math.abs(riemannSum - exactIntegral);
   const percentAccuracy = Math.max(0, 100 - (error / Math.max(1, Math.abs(exactIntegral))) * 100);
-  const dx = (Math.abs(b - a) / n).toFixed(3);
+  const dx = (Math.abs(b - a) / Math.max(1, n)).toFixed(3);
+
+  const handleTypeChange = (t: 'left' | 'right' | 'midpoint' | 'trapezoid') => {
+    sounds.playPop();
+    onUpdateType(t);
+  };
+
+  const handlePresetSelect = (presetN: number) => {
+    sounds.playPop();
+    onUpdateN(presetN);
+  };
 
   return (
     <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
@@ -45,7 +56,7 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
         {/* Method selector */}
         <div className="flex flex-wrap gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-medium">
           <button
-            onClick={() => onUpdateType('left')}
+            onClick={() => handleTypeChange('left')}
             className={`px-3 py-1.5 rounded-lg transition-all ${
               riemannType === 'left' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -53,7 +64,7 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
             Links-Summe
           </button>
           <button
-            onClick={() => onUpdateType('right')}
+            onClick={() => handleTypeChange('right')}
             className={`px-3 py-1.5 rounded-lg transition-all ${
               riemannType === 'right' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -61,7 +72,7 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
             Rechts-Summe
           </button>
           <button
-            onClick={() => onUpdateType('midpoint')}
+            onClick={() => handleTypeChange('midpoint')}
             className={`px-3 py-1.5 rounded-lg transition-all ${
               riemannType === 'midpoint' ? 'bg-indigo-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -69,7 +80,7 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
             Mittelpunkt-Summe
           </button>
           <button
-            onClick={() => onUpdateType('trapezoid')}
+            onClick={() => handleTypeChange('trapezoid')}
             className={`px-3 py-1.5 rounded-lg transition-all ${
               riemannType === 'trapezoid' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -79,29 +90,69 @@ export const IntegralRiemannExplainer: React.FC<IntegralRiemannExplainerProps> =
         </div>
       </div>
 
-      {/* Slider for n subdivisions */}
-      <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-        <div className="flex justify-between items-center text-xs">
-          <span className="text-slate-400 font-mono flex items-center gap-1.5">
+      {/* Interactive Controls for n subdivisions */}
+      <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-slate-300 font-bold text-sm flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-blue-400" />
-            Anzahl der Streifen (n):
+            Anzahl der Rechtecke / Streifen bestimmen:
           </span>
-          <span className="font-mono font-bold text-white bg-blue-600/30 border border-blue-500/40 px-2.5 py-0.5 rounded-lg text-sm">
-            n = {n} Rechtecke (<MathRenderer latex={`\\Delta x = ${dx}`} />)
-          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onUpdateN(Math.max(1, n - 1))}
+              className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white"
+              title="1 weniger"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <div className="flex items-center bg-slate-900 px-3 py-1 rounded-xl border border-blue-500/50">
+              <span className="text-xs text-slate-400 font-mono mr-1.5 font-bold">n =</span>
+              <input
+                type="number"
+                min="1"
+                max="200"
+                value={n}
+                onChange={(e) => onUpdateN(Math.max(1, Math.min(200, Number(e.target.value))))}
+                className="w-14 bg-transparent text-blue-300 font-mono font-bold text-sm focus:outline-none text-center"
+              />
+            </div>
+            <button
+              onClick={() => onUpdateN(Math.min(200, n + 1))}
+              className="p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white"
+              title="1 mehr"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
+
         <input
           type="range"
           min="1"
-          max="100"
+          max="150"
           value={n}
           onChange={(e) => onUpdateN(Number(e.target.value))}
-          className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
-        <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-          <span>n = 1 (Grobes Rechteck)</span>
-          <span>n = 50</span>
-          <span>n = 100 (Fast exakt!)</span>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-400">
+          <span>Rechtecks-Breite: <strong className="text-cyan-300">Δx = {dx}</strong></span>
+          <div className="flex gap-1.5">
+            {[1, 5, 10, 25, 50, 100].map((presetN) => (
+              <button
+                key={presetN}
+                onClick={() => handlePresetSelect(presetN)}
+                className={`px-2.5 py-1 rounded-lg border transition-all ${
+                  n === presetN
+                    ? 'bg-blue-600 border-blue-400 text-white font-bold'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                n={presetN}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

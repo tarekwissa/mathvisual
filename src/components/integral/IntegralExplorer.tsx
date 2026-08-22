@@ -12,7 +12,8 @@ import {
 } from '../../utils/mathParser';
 import type { PresetFunction } from '../../types/math';
 import { MathRenderer } from '../common/MathRenderer';
-import { Activity, Layers, Sparkles, Sigma, Eye } from 'lucide-react';
+import { Activity, Layers, Sparkles, Sigma, Eye, Plus, Minus } from 'lucide-react';
+import { sounds } from '../../utils/soundEffects';
 
 export const IntegralExplorer: React.FC = () => {
   // Active Preset & Expression
@@ -88,6 +89,7 @@ export const IntegralExplorer: React.FC = () => {
   }, [primaryFn, a]);
 
   const handleSelectPreset = (preset: PresetFunction) => {
+    sounds.playPop();
     setSelectedPresetId(preset.id);
     setIsCustom(false);
     setCustomExpr(preset.expression);
@@ -96,11 +98,20 @@ export const IntegralExplorer: React.FC = () => {
   };
 
   const handleSetTwoFunctionsPreset = (f: string, g: string, newA: number, newB: number) => {
+    sounds.playPop();
     setIsCustom(true);
     setCustomExpr(f);
     setSecondExpr(g);
     setA(newA);
     setB(newB);
+  };
+
+  const handleUpdateN = (newN: number) => {
+    const clamped = Math.max(1, Math.min(200, newN));
+    setRiemannN(clamped);
+    if (Math.random() < 0.25) {
+      sounds.playPop();
+    }
   };
 
   return (
@@ -118,7 +129,7 @@ export const IntegralExplorer: React.FC = () => {
             Der Integral-Visualizer
           </h1>
           <p className="mt-2 text-slate-300 max-w-3xl text-sm sm:text-base leading-relaxed">
-            Verstehe die Integralrechnung intuitiv: Untersuche, wie Flächen unter Kurven entstehen, experimentiere mit <strong>Riemann-Summen</strong> und entdecke den <strong>Hauptsatz der Analysis</strong>!
+            Verstehe die Integralrechnung intuitiv: Untersuche, wie Flächen unter Kurven entstehen, experimentiere mit <strong>Riemann-Summen</strong> und bestimme die <strong>Anzahl der Rechtecke</strong> frei!
           </p>
 
           {/* Quick Preset Function Selector Pills */}
@@ -142,7 +153,10 @@ export const IntegralExplorer: React.FC = () => {
                 </button>
               ))}
               <button
-                onClick={() => setIsCustom(true)}
+                onClick={() => {
+                  sounds.playPop();
+                  setIsCustom(true);
+                }}
                 className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all ${
                   isCustom
                     ? 'bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-600/30'
@@ -182,17 +196,20 @@ export const IntegralExplorer: React.FC = () => {
       {/* Mode Switcher Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
-          { id: 'single', label: 'Fläche unter f(x)', icon: Activity },
-          { id: 'riemann', label: 'Riemann-Summen (Rechtecke)', icon: Layers },
-          { id: 'between', label: 'Fläche zwischen zwei Graphen', icon: Sparkles },
-          { id: 'hdi_accumulator', label: 'Stammfunktion & Hauptsatz (HDI)', icon: Eye }
+          { id: 'single', label: '1. Fläche unter f(x)', icon: Activity },
+          { id: 'riemann', label: '2. Riemann-Summen (Rechtecks-Labor)', icon: Layers },
+          { id: 'between', label: '3. Fläche zwischen zwei Graphen', icon: Sparkles },
+          { id: 'hdi_accumulator', label: '4. Stammfunktion & Hauptsatz (HDI)', icon: Eye }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeMode === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveMode(tab.id as any)}
+              onClick={() => {
+                sounds.playPop();
+                setActiveMode(tab.id as any);
+              }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 isActive
                   ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
@@ -205,6 +222,117 @@ export const IntegralExplorer: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Direct Riemann Rectangle Controller in Riemann Mode */}
+      {activeMode === 'riemann' && (
+        <div className="bg-slate-900/90 border border-blue-500/40 rounded-2xl p-5 shadow-xl space-y-4 animate-fadeIn">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1 bg-blue-500/20 text-blue-400 rounded-md text-[10px] font-mono uppercase font-bold">
+                  Rechtecke konfigurieren
+                </span>
+                <span className="text-white font-bold text-base">
+                  Anzahl der Riemann-Streifen (n):
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Stelle die Streifenanzahl beliebig ein. Je mehr Rechtecke, desto exakter nähert sich die Summe dem Integral an!
+              </p>
+            </div>
+
+            {/* Direct Number Input & Stepper Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleUpdateN(riemannN - 1)}
+                className="p-2 rounded-xl bg-slate-950 text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-800 transition-all"
+                title="1 Rechteck weniger"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <div className="flex items-center bg-slate-950 px-3 py-1.5 rounded-xl border border-blue-500/50">
+                <span className="text-xs text-slate-400 font-mono mr-2 font-bold">n =</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={riemannN}
+                  onChange={(e) => handleUpdateN(Number(e.target.value))}
+                  className="w-16 bg-transparent text-blue-300 font-mono font-bold text-base focus:outline-none text-center"
+                />
+              </div>
+              <button
+                onClick={() => handleUpdateN(riemannN + 1)}
+                className="p-2 rounded-xl bg-slate-950 text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-800 transition-all"
+                title="1 Rechteck mehr"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Slider and Fast Preset Buttons */}
+          <div className="space-y-2">
+            <input
+              type="range"
+              min="1"
+              max="150"
+              value={riemannN}
+              onChange={(e) => handleUpdateN(Number(e.target.value))}
+              className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-400"
+            />
+
+            {/* Quick n presets */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <span className="text-xs text-slate-500 font-mono">Schnell-Auswahl:</span>
+              <div className="flex flex-wrap gap-1.5 text-xs font-mono">
+                {[1, 2, 4, 8, 16, 32, 50, 100].map((presetN) => (
+                  <button
+                    key={presetN}
+                    onClick={() => {
+                      sounds.playPop();
+                      setRiemannN(presetN);
+                    }}
+                    className={`px-3 py-1 rounded-xl border transition-all ${
+                      riemannN === presetN
+                        ? 'bg-blue-600 border-blue-400 text-white font-bold shadow'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    n = {presetN}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Riemann Type Picker (Method) */}
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-800">
+            <span className="text-xs text-slate-400 font-mono self-center mr-2">Methode:</span>
+            {[
+              { id: 'left', label: 'Links-Summe' },
+              { id: 'right', label: 'Rechts-Summe' },
+              { id: 'midpoint', label: 'Mittelpunkt-Summe' },
+              { id: 'trapezoid', label: 'Trapez-Regel' }
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => {
+                  sounds.playPop();
+                  setRiemannType(m.id as any);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  riemannType === m.id
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Canvas Graph Section */}
       <div className="space-y-4">
@@ -312,18 +440,22 @@ export const IntegralExplorer: React.FC = () => {
 
           <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-between">
             <div>
-              <span className="text-xs text-emerald-400 uppercase font-mono block">Flächenbilanz (Integral):</span>
+              <span className="text-xs text-emerald-400 uppercase font-mono block">
+                {activeMode === 'riemann' ? `Riemann-Summe (n=${riemannN}):` : 'Flächenbilanz (Integral):'}
+              </span>
               <div className="text-2xl font-extrabold font-mono text-white mt-0.5">
-                {signedIntegral.toFixed(4)}
+                {activeMode === 'riemann' ? riemannSum.toFixed(4) : signedIntegral.toFixed(4)}
               </div>
             </div>
           </div>
 
           <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-between">
             <div>
-              <span className="text-xs text-cyan-400 uppercase font-mono block">Geometrischer Flächeninhalt:</span>
+              <span className="text-xs text-cyan-400 uppercase font-mono block">
+                {activeMode === 'riemann' ? 'Exaktes Integral:' : 'Geometrischer Flächeninhalt:'}
+              </span>
               <div className="text-2xl font-extrabold font-mono text-cyan-400 mt-0.5">
-                {absoluteArea.toFixed(4)} FE
+                {activeMode === 'riemann' ? signedIntegral.toFixed(4) : `${absoluteArea.toFixed(4)} FE`}
               </div>
             </div>
           </div>
@@ -337,7 +469,7 @@ export const IntegralExplorer: React.FC = () => {
             exactIntegral={signedIntegral}
             riemannSum={riemannSum}
             n={riemannN}
-            onUpdateN={setRiemannN}
+            onUpdateN={handleUpdateN}
             riemannType={riemannType}
             onUpdateType={setRiemannType}
             a={a}
