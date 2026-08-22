@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scissors, Box, Layers } from 'lucide-react';
+import { Scissors, Box, Layers, Edit3 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const Percent100ChunksConcept: React.FC = () => {
@@ -23,6 +23,12 @@ export const Percent100ChunksConcept: React.FC = () => {
     setUnit(newUnit);
   };
 
+  const handlePresetSelect = (val: number, u: string) => {
+    sounds.playPop();
+    setTotalValue(val);
+    setUnit(u);
+  };
+
   return (
     <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
       {/* Title */}
@@ -33,11 +39,11 @@ export const Percent100ChunksConcept: React.FC = () => {
               Das Grundprinzip
             </span>
             <h3 className="text-xl sm:text-2xl font-bold text-white">
-              Die 100-Häppchen-Maschine
+              Die 100-Häppchen-Maschine: Beliebige Grundwerte
             </h3>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            "Pro-Zent" bedeutet wörtlich: <strong>"Von Hundert"</strong>. Stell dir vor, wir zerschneiden alles in genau 100 gleiche Mini-Teile!
+            "Pro-Zent" bedeutet wörtlich: <strong>"Von Hundert"</strong>. Gib eine <strong>beliebige Zahl</strong> ein – die Maschine schneidet sie sofort in 100 gleiche Teile!
           </p>
         </div>
 
@@ -59,6 +65,57 @@ export const Percent100ChunksConcept: React.FC = () => {
         </div>
       </div>
 
+      {/* Quick Presets & Custom Input Bar */}
+      <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold">
+          <Edit3 className="w-4 h-4 text-amber-400" />
+          Schnell-Vorlagen für den Grundwert (G):
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs font-mono">
+          {[
+            { val: 80, u: '€' },
+            { val: 250, u: '€' },
+            { val: 600, u: 'Schüler' },
+            { val: 1200, u: 'Gramm' },
+            { val: 50000, u: 'Follower' }
+          ].map((preset) => (
+            <button
+              key={preset.val + preset.u}
+              onClick={() => handlePresetSelect(preset.val, preset.u)}
+              className={`px-3 py-1.5 rounded-xl border transition-all ${
+                totalValue === preset.val && unit === preset.u
+                  ? 'bg-amber-600 border-amber-400 text-white font-bold'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {preset.val.toLocaleString('de-DE')} {preset.u}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700">
+          <span className="text-xs text-slate-400 font-mono">Beliebige Zahl:</span>
+          <input
+            type="number"
+            min="1"
+            max="10000000"
+            value={totalValue}
+            onChange={(e) => {
+              setTotalValue(Math.max(1, Number(e.target.value)));
+              sounds.playPop();
+            }}
+            className="w-28 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-white font-mono text-sm font-bold focus:outline-none focus:border-amber-400"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-amber-300 font-mono text-xs font-bold focus:outline-none focus:border-amber-400 text-center"
+          />
+        </div>
+      </div>
+
       {/* Step 1 & Step 2 Visual Demonstration */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Machine Step 1: The Whole */}
@@ -75,24 +132,12 @@ export const Percent100ChunksConcept: React.FC = () => {
             <div className="text-3xl font-extrabold text-white font-mono">
               {totalValue.toLocaleString('de-DE')} {unit}
             </div>
-            <span className="text-xs text-slate-400 mt-1 block">Dein Startwert (100%)</span>
+            <span className="text-xs text-slate-400 mt-1 block">Dein Grundwert (100%)</span>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[11px] text-slate-400 block font-mono">Startwert ändern:</label>
-            <input
-              type="number"
-              min="10"
-              max="10000"
-              step="10"
-              value={totalValue}
-              onChange={(e) => {
-                setTotalValue(Math.max(1, Number(e.target.value)));
-                sounds.playPop();
-              }}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-blue-400"
-            />
-          </div>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Das ist dein Ausgangswert, den wir jetzt in 100 Teile schneiden.
+          </p>
         </div>
 
         {/* Machine Step 2: The 1% Chunk */}
@@ -115,7 +160,7 @@ export const Percent100ChunksConcept: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed">
-            {totalValue} {unit} geteilt durch 100 = <strong>{oneChunkValue.toFixed(2)} {unit}</strong> pro Teilchen.
+            {totalValue.toLocaleString('de-DE')} {unit} ÷ 100 = <strong>{oneChunkValue.toFixed(2)} {unit}</strong> pro Teilchen.
           </p>
         </div>
 

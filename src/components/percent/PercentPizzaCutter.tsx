@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Sparkles, Check } from 'lucide-react';
+import { Sparkles, Check, Edit3 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentPizzaCutter: React.FC = () => {
   const [totalSlices, setTotalSlices] = useState<number>(4); // Cut into 2, 4, 5, 8, 10 pieces
   const [selectedSlices, setSelectedSlices] = useState<number>(1);
+  const [pizzaGrundwert, setPizzaGrundwert] = useState<number>(400); // 400 g
+  const [unit, setUnit] = useState<string>('Gramm');
 
   const fractionPercent = (selectedSlices / totalSlices) * 100;
   const decimal = (selectedSlices / totalSlices).toFixed(2);
+  const prozentwert = (pizzaGrundwert * selectedSlices) / totalSlices;
 
   const handleSliceClick = (sliceIdx: number) => {
     sounds.playSlice();
@@ -33,11 +36,11 @@ export const PercentPizzaCutter: React.FC = () => {
               Brüche ➔ Prozent im Kopf
             </span>
             <h3 className="text-xl sm:text-2xl font-bold text-white">
-              Pizza- & Schoko-Teiler
+              Pizza- & Schoko-Teiler mit beliebigem Grundwert
             </h3>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Wie hängen Bruchteile (<span className="font-mono">½, ¼, ⅒</span>) mit Prozent zusammen? Klicke auf die Stücke!
+            Gib der Pizza oder Tafel einen <strong>beliebigen Gesamtwert</strong> (z.B. 400g oder 12€) und schneide sie in Stücke!
           </p>
         </div>
 
@@ -62,6 +65,60 @@ export const PercentPizzaCutter: React.FC = () => {
               {item.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Custom Grundwert input for Pizza */}
+      <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold">
+          <Edit3 className="w-4 h-4 text-rose-400" />
+          Grundwert der gesamten Pizza/Tafel (100%):
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs font-mono">
+          {[
+            { val: 400, u: 'Gramm' },
+            { val: 12, u: '€' },
+            { val: 800, u: 'kcal' },
+            { val: 100, u: 'Stück' }
+          ].map((preset) => (
+            <button
+              key={preset.u}
+              onClick={() => {
+                sounds.playPop();
+                setPizzaGrundwert(preset.val);
+                setUnit(preset.u);
+              }}
+              className={`px-3 py-1.5 rounded-xl border transition-all ${
+                pizzaGrundwert === preset.val && unit === preset.u
+                  ? 'bg-rose-600 border-rose-400 text-white font-bold'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {preset.val} {preset.u}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700">
+          <span className="text-xs text-slate-400 font-mono">Freie Eingabe:</span>
+          <input
+            type="number"
+            min="1"
+            max="100000"
+            value={pizzaGrundwert}
+            onChange={(e) => {
+              setPizzaGrundwert(Math.max(1, Number(e.target.value)));
+              sounds.playPop();
+            }}
+            className="w-24 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-white font-mono text-sm font-bold focus:outline-none focus:border-rose-400"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-rose-300 font-mono text-xs font-bold focus:outline-none focus:border-rose-400 text-center"
+          />
         </div>
       </div>
 
@@ -131,43 +188,45 @@ export const PercentPizzaCutter: React.FC = () => {
           </span>
         </div>
 
-        {/* Triple-Representation Cards (Bruch, Dezimal, Prozent) */}
+        {/* 4 Cards: Bruch, Dezimal, Prozent, Absoluter Wert */}
         <div className="lg:col-span-6 space-y-4">
           <div className="text-sm font-bold text-slate-300">
-            Drei Schreibweisen für exakt denselben Anteil:
+            Drei Schreibweisen + berechneter Wert deines Grundwerts:
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {/* Fraction */}
-            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
-              <span className="text-[10px] uppercase font-mono text-slate-500 block">Als Bruch:</span>
-              <div className="text-2xl font-extrabold text-white font-mono">
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
+              <span className="text-[9px] uppercase font-mono text-slate-500 block">Bruch:</span>
+              <div className="text-xl font-extrabold text-white font-mono">
                 {selectedSlices}/{totalSlices}
               </div>
-              <span className="text-[11px] text-slate-400">
-                {selectedSlices} von {totalSlices} Stücken
-              </span>
             </div>
 
             {/* Decimal */}
-            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
-              <span className="text-[10px] uppercase font-mono text-slate-500 block">Als Dezimal:</span>
-              <div className="text-2xl font-extrabold text-cyan-400 font-mono">
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-1">
+              <span className="text-[9px] uppercase font-mono text-slate-500 block">Dezimal:</span>
+              <div className="text-xl font-extrabold text-cyan-400 font-mono">
                 {decimal}
               </div>
-              <span className="text-[11px] text-slate-400">
-                {selectedSlices} ÷ {totalSlices}
-              </span>
             </div>
 
             {/* Percentage */}
-            <div className="p-4 bg-slate-950 rounded-2xl border border-rose-500/40 bg-rose-950/20 text-center space-y-1">
-              <span className="text-[10px] uppercase font-mono text-rose-400 font-bold block">In Prozent:</span>
-              <div className="text-2xl font-extrabold text-rose-400 font-mono">
+            <div className="p-3 bg-slate-950 rounded-2xl border border-rose-500/40 bg-rose-950/20 text-center space-y-1">
+              <span className="text-[9px] uppercase font-mono text-rose-400 font-bold block">Prozent:</span>
+              <div className="text-xl font-extrabold text-rose-400 font-mono">
                 {fractionPercent.toLocaleString('de-DE', { maximumFractionDigits: 1 })}%
               </div>
-              <span className="text-[11px] text-rose-300/80">
-                Von 100 Teilen
+            </div>
+
+            {/* Calculated Real Value */}
+            <div className="p-3 bg-slate-950 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 text-center space-y-1">
+              <span className="text-[9px] uppercase font-mono text-emerald-400 font-bold block">Wert:</span>
+              <div className="text-xl font-extrabold text-emerald-300 font-mono truncate">
+                {prozentwert.toLocaleString('de-DE', { maximumFractionDigits: 1 })}
+              </div>
+              <span className="text-[9px] text-emerald-200/80 block truncate">
+                {unit}
               </span>
             </div>
           </div>
@@ -176,14 +235,13 @@ export const PercentPizzaCutter: React.FC = () => {
           <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-950/30 via-slate-900 to-slate-950 border border-rose-500/20 text-xs text-slate-300 space-y-2 leading-relaxed">
             <div className="font-bold text-rose-300 flex items-center gap-1.5 text-sm">
               <Check className="w-4 h-4" />
-              Kopf-Rechen-Merkregel:
+              Kopf-Rechen-Merkregel mit Grundwert {pizzaGrundwert} {unit}:
             </div>
             <ul className="space-y-1 list-disc list-inside text-slate-300">
-              <li><strong>½ (Hälfte)</strong> = immer <strong>50%</strong> (100 ÷ 2)</li>
-              <li><strong>¼ (Viertel)</strong> = immer <strong>25%</strong> (100 ÷ 4)</li>
-              <li><strong>¾ (Dreiviertel)</strong> = <strong>75%</strong> (3 × 25%)</li>
-              <li><strong>⅒ (Zehntel)</strong> = immer <strong>10%</strong> (100 ÷ 10)</li>
-              <li><strong>⅕ (Fünftel)</strong> = immer <strong>20%</strong> (100 ÷ 5)</li>
+              <li><strong>½ (Hälfte)</strong> = 50% = <strong>{(pizzaGrundwert * 0.5).toFixed(1)} {unit}</strong></li>
+              <li><strong>¼ (Viertel)</strong> = 25% = <strong>{(pizzaGrundwert * 0.25).toFixed(1)} {unit}</strong></li>
+              <li><strong>¾ (Dreiviertel)</strong> = 75% = <strong>{(pizzaGrundwert * 0.75).toFixed(1)} {unit}</strong></li>
+              <li><strong>⅒ (Zehntel)</strong> = 10% = <strong>{(pizzaGrundwert * 0.1).toFixed(1)} {unit}</strong></li>
             </ul>
           </div>
         </div>

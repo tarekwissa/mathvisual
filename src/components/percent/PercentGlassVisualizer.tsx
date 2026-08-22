@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GlassWater, BatteryMedium, Sparkles, Droplets } from 'lucide-react';
+import { GlassWater, BatteryMedium, Sparkles, Droplets, Edit3 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentGlassVisualizer: React.FC = () => {
-  const [glassCapacity, setGlassCapacity] = useState<number>(500); // 500 ml
+  const [glassCapacity, setGlassCapacity] = useState<number>(500); // e.g. 500 ml
+  const [unit, setUnit] = useState<string>('ml');
   const [fillPercent, setFillPercent] = useState<number>(40); // 40%
   const [mode, setMode] = useState<'water' | 'battery'>('water');
 
@@ -28,7 +29,7 @@ export const PercentGlassVisualizer: React.FC = () => {
 
   const handleFillChange = (val: number) => {
     setFillPercent(val);
-    setWaveIntensity(2.5); // Slosh higher on movement
+    setWaveIntensity(2.5);
     setTimeout(() => setWaveIntensity(1), 400);
     sounds.playWaterPour(val / 100);
   };
@@ -38,6 +39,13 @@ export const PercentGlassVisualizer: React.FC = () => {
     setWaveIntensity(3.5);
     setTimeout(() => setWaveIntensity(1), 600);
     sounds.playWaterPour(p / 100);
+  };
+
+  const handleCapacityPreset = (cap: number, customUnit: string, targetMode: 'water' | 'battery') => {
+    sounds.playPop();
+    setGlassCapacity(cap);
+    setUnit(customUnit);
+    setMode(targetMode);
   };
 
   const currentAmount = (glassCapacity * fillPercent) / 100;
@@ -94,11 +102,11 @@ export const PercentGlassVisualizer: React.FC = () => {
               Füllstand & Intuition
             </span>
             <h3 className="text-xl sm:text-2xl font-bold text-white">
-              Das Füllstands-Labor: Wie "voll" ist etwas?
+              Das Füllstands-Labor: Beliebige Grundwerte
             </h3>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Vergiss alle Formeln! Prozent bedeutet einfach nur: <strong>Wie voll ist ein Gefäß oder Akku im Vergleich zum Ganzen?</strong>
+            Wähle einen <strong>beliebigen Grundwert</strong> (z.B. 250 ml Tasse, 1.500 ml Flasche oder 5.000 mAh Akku) und verändere den Füllstand!
           </p>
         </div>
 
@@ -108,26 +116,82 @@ export const PercentGlassVisualizer: React.FC = () => {
             onClick={() => {
               sounds.playPop();
               setMode('water');
+              setUnit('ml');
             }}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
               mode === 'water' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             <GlassWater className="w-4 h-4" />
-            Wasserglas (mit Wellen)
+            Flüssigkeit
           </button>
           <button
             onClick={() => {
               sounds.playPop();
               setMode('battery');
+              setUnit('mAh');
             }}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
               mode === 'battery' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
             <BatteryMedium className="w-4 h-4" />
-            Smartphone-Akku
+            Akku
           </button>
+        </div>
+      </div>
+
+      {/* Grundwert Quick-Presets & Custom Input Bar */}
+      <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold">
+          <Edit3 className="w-4 h-4 text-cyan-400" />
+          Grundwert (Das Ganze = 100%):
+        </div>
+
+        {/* Fast presets */}
+        <div className="flex flex-wrap gap-1.5 text-xs font-mono">
+          {[
+            { cap: 200, label: '200 ml (Glas)', unit: 'ml', mode: 'water' as const },
+            { cap: 500, label: '500 ml (Flasche)', unit: 'ml', mode: 'water' as const },
+            { cap: 1000, label: '1.000 ml (Krug)', unit: 'ml', mode: 'water' as const },
+            { cap: 4000, label: '4.000 mAh (Smartphone)', unit: 'mAh', mode: 'battery' as const },
+            { cap: 10000, label: '10.000 mAh (Powerbank)', unit: 'mAh', mode: 'battery' as const }
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => handleCapacityPreset(item.cap, item.unit, item.mode)}
+              className={`px-3 py-1.5 rounded-xl border transition-all ${
+                glassCapacity === item.cap && unit === item.unit
+                  ? 'bg-cyan-600 border-cyan-400 text-white font-bold'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Arbitrary custom numeric input */}
+        <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700">
+          <span className="text-xs text-slate-400 font-mono">Beliebiger Wert:</span>
+          <input
+            type="number"
+            min="1"
+            max="1000000"
+            value={glassCapacity}
+            onChange={(e) => {
+              setGlassCapacity(Math.max(1, Number(e.target.value)));
+              sounds.playPop();
+            }}
+            className="w-24 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-white font-mono text-sm font-bold focus:outline-none focus:border-cyan-400"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="Einheit"
+            className="w-16 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1 text-cyan-300 font-mono text-xs font-bold focus:outline-none focus:border-cyan-400 text-center"
+          />
         </div>
       </div>
 
@@ -135,15 +199,14 @@ export const PercentGlassVisualizer: React.FC = () => {
         {/* Interactive Visual Glass / Battery with Fluid Wave Simulation */}
         <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-950/80 rounded-3xl border border-slate-800 relative">
           {mode === 'water' ? (
-            /* Measuring Cup / Water Glass with undulating waves */
             <div className="relative w-44 h-72 border-4 border-slate-600/80 border-t-0 rounded-b-3xl overflow-hidden bg-slate-900/60 shadow-2xl flex flex-col justify-end">
               {/* Measurement Scale Markings on Glass */}
               <div className="absolute inset-y-0 left-2 flex flex-col justify-between py-4 pointer-events-none text-[10px] font-mono text-slate-400 z-20">
-                <span>100% ({glassCapacity} ml)</span>
-                <span>75% ({Math.round(glassCapacity * 0.75)} ml)</span>
-                <span>50% ({Math.round(glassCapacity * 0.5)} ml)</span>
-                <span>25% ({Math.round(glassCapacity * 0.25)} ml)</span>
-                <span>0% (0 ml)</span>
+                <span>100% ({glassCapacity} {unit})</span>
+                <span>75% ({Math.round(glassCapacity * 0.75)} {unit})</span>
+                <span>50% ({Math.round(glassCapacity * 0.5)} {unit})</span>
+                <span>25% ({Math.round(glassCapacity * 0.25)} {unit})</span>
+                <span>0% (0 {unit})</span>
               </div>
 
               {/* Dynamic SVG Water Wave */}
@@ -203,14 +266,13 @@ export const PercentGlassVisualizer: React.FC = () => {
                       {fillPercent}%
                     </span>
                     <span className="text-xs font-mono font-bold text-cyan-200">
-                      {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ml
+                      {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 1 })} {unit}
                     </span>
                   </>
                 )}
               </div>
             </div>
           ) : (
-            /* Smartphone Battery Visualizer */
             <div className="relative flex flex-col items-center">
               <div className="w-12 h-3 bg-slate-600 rounded-t-md" />
               <div className="w-48 h-64 border-4 border-slate-600 rounded-2xl p-2 bg-slate-900/80 shadow-2xl flex flex-col justify-end overflow-hidden relative">
@@ -224,7 +286,6 @@ export const PercentGlassVisualizer: React.FC = () => {
                   }`}
                   style={{ height: `${fillPercent}%` }}
                 >
-                  {/* Energy Sparkle Bar */}
                   <div className="absolute top-0 inset-x-0 h-2 bg-white/40 animate-pulse" />
 
                   {fillPercent > 10 && (
@@ -233,7 +294,7 @@ export const PercentGlassVisualizer: React.FC = () => {
                         {fillPercent}%
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-100 drop-shadow">
-                        {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 0 })} mAh
+                        {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 0 })} {unit}
                       </span>
                     </>
                   )}
@@ -243,7 +304,7 @@ export const PercentGlassVisualizer: React.FC = () => {
           )}
 
           <div className="mt-4 text-xs text-slate-400 text-center font-mono">
-            {fillPercent === 0 ? 'Vollkommen leer (0%)' : fillPercent === 100 ? 'Randvoll (100%)' : `${fillPercent}% gefüllt`}
+            {fillPercent === 0 ? 'Vollkommen leer (0%)' : fillPercent === 100 ? `Randvoll (100% = ${glassCapacity} ${unit})` : `${fillPercent}% gefüllt`}
           </div>
         </div>
 
@@ -270,7 +331,7 @@ export const PercentGlassVisualizer: React.FC = () => {
               className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
             />
 
-            {/* Quick buttons */}
+            {/* Quick percentage buttons */}
             <div className="grid grid-cols-4 gap-2 pt-1">
               {[
                 { p: 25, label: '¼ (Viertel)' },
@@ -294,46 +355,24 @@ export const PercentGlassVisualizer: React.FC = () => {
             </div>
           </div>
 
-          {/* Slider: Capacity of the container (Grundwert) */}
-          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
-            <div className="flex justify-between items-center text-xs text-slate-400 font-mono">
-              <span>Fassungsvermögen des ganzen Gefäßes (Das Ganze):</span>
-              <span className="text-white font-bold text-sm">
-                {glassCapacity} {mode === 'water' ? 'ml' : 'mAh'}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="100"
-              max="2000"
-              step="50"
-              value={glassCapacity}
-              onChange={(e) => {
-                setGlassCapacity(Number(e.target.value));
-                sounds.playPop();
-              }}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-400"
-            />
-          </div>
-
           {/* The Core AHA-Moment Box */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3">
             <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              Der "Aha!"-Moment für dein Verständnis:
+              Der "Aha!"-Effekt mit deinem Grundwert:
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              <strong>50%</strong> bedeutet immer genau <strong>"halb voll"</strong> – ganz egal, wie riesig oder winzig das Glas ist!
+              Egal ob der Grundwert <strong>{glassCapacity} {unit}</strong> oder 1 Million ist: <strong>{fillPercent}%</strong> ist immer genau dasselbe Verhältnis!
             </p>
             <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
               <div>
-                <span className="text-slate-500 block text-[10px] uppercase font-mono">Im Glas befinden sich gerade:</span>
-                <span className="text-lg font-bold text-cyan-300 font-mono">
-                  {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 1 })} {mode === 'water' ? 'ml' : 'mAh'}
+                <span className="text-slate-500 block text-[10px] uppercase font-mono">Im Gefäß befinden sich gerade:</span>
+                <span className="text-xl font-bold text-cyan-300 font-mono">
+                  {currentAmount.toLocaleString('de-DE', { maximumFractionDigits: 2 })} {unit}
                 </span>
               </div>
               <div className="text-right text-slate-400 text-xs">
-                Das sind genau <strong>{fillPercent}%</strong> von <strong>{glassCapacity} {mode === 'water' ? 'ml' : 'mAh'}</strong>.
+                Das sind genau <strong>{fillPercent}%</strong> von <strong>{glassCapacity} {unit}</strong>.
               </div>
             </div>
           </div>
