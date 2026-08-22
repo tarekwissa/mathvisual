@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, Flame, HelpCircle, CheckCircle, XCircle, ArrowRight, Award, RefreshCw, Sparkles, Filter } from 'lucide-react';
+import { Trophy, Flame, HelpCircle, CheckCircle, XCircle, ArrowRight, Award, Filter } from 'lucide-react';
 import { MathRenderer } from '../common/MathRenderer';
 import type { QuizQuestion } from '../../types/math';
 import { sounds } from '../../utils/soundEffects';
