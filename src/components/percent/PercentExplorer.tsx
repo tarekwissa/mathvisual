@@ -1,30 +1,19 @@
 import React, { useState } from 'react';
+import { Percent100GridTutor } from './Percent100GridTutor';
 import { PercentGlassVisualizer } from './PercentGlassVisualizer';
-import { Percent100ChunksConcept } from './Percent100ChunksConcept';
 import { PercentPizzaCutter } from './PercentPizzaCutter';
-import { PercentIntuitionGame } from './PercentIntuitionGame';
 import { PercentRealWorldScenarios } from './PercentRealWorldScenarios';
-import { PercentFormulaTriangle } from './PercentFormulaTriangle';
-import { Percent, ChevronDown } from 'lucide-react';
+import { Percent, ChevronDown, Bot, GlassWater, Pizza, Tag } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentExplorer: React.FC = () => {
-  const [activeView, setActiveView] = useState<
-    'glass' | 'chunks' | 'pizza' | 'game' | 'scenarios' | 'triangle'
-  >('glass');
-
-  const [grundwert] = useState<number>(200);
-  const [prozentsatz] = useState<number>(35);
-  const [activeTarget, setActiveTarget] = useState<'W' | 'G' | 'p'>('W');
-  const prozentwert = (grundwert * prozentsatz) / 100;
+  const [activeView, setActiveView] = useState<'grid_tutor' | 'glass' | 'pizza' | 'scenarios'>('grid_tutor');
 
   const viewOptions = [
-    { id: 'glass', label: '1. Füllstands-Labor (Wie voll ist das Glas?)' },
-    { id: 'chunks', label: '2. Die 100-Häppchen-Maschine' },
-    { id: 'pizza', label: '3. Pizza- & Schoko-Teiler (Brüche zu %)' },
-    { id: 'game', label: '4. Augenmaß-Trainer (Schätz-Labor)' },
-    { id: 'scenarios', label: '5. Reallife (Rabatt, MwSt, Trinkgeld)' },
-    { id: 'triangle', label: '6. Formel-Pyramide (Für die Schule)' }
+    { id: 'grid_tutor', label: '1. Die Hundertertafel (Didaktischer 8.-Klasse-Tutor)', icon: Bot },
+    { id: 'glass', label: '2. Füllstands-Labor (Wie voll ist das Glas?)', icon: GlassWater },
+    { id: 'pizza', label: '3. Pizza- & Schoko-Teiler (Brüche zu %)', icon: Pizza },
+    { id: 'scenarios', label: '4. Reallife-Labor (Rabatt, MwSt, Trinkgeld)', icon: Tag }
   ];
 
   return (
@@ -44,7 +33,7 @@ export const PercentExplorer: React.FC = () => {
               Der Prozent-Erklärer
             </h1>
             <p className="mt-1 text-slate-300 max-w-2xl text-xs sm:text-sm leading-relaxed">
-              Vergiss komplizierte Formeln! Wähle ein interaktives Lern-Modell aus:
+              Vergiss trockene Formeln! Verstehe Prozentrechnung über die <strong>100er-Tafel</strong> und anschauliche Experimente:
             </p>
           </div>
 
@@ -76,25 +65,13 @@ export const PercentExplorer: React.FC = () => {
 
       {/* Active Concept Views */}
       <div className="transition-all duration-300">
-        {activeView === 'glass' && <PercentGlassVisualizer />}
+        {activeView === 'grid_tutor' && <Percent100GridTutor />}
 
-        {activeView === 'chunks' && <Percent100ChunksConcept />}
+        {activeView === 'glass' && <PercentGlassVisualizer />}
 
         {activeView === 'pizza' && <PercentPizzaCutter />}
 
-        {activeView === 'game' && <PercentIntuitionGame />}
-
         {activeView === 'scenarios' && <PercentRealWorldScenarios />}
-
-        {activeView === 'triangle' && (
-          <PercentFormulaTriangle
-            grundwert={grundwert}
-            prozentsatz={prozentsatz}
-            prozentwert={prozentwert}
-            activeTarget={activeTarget}
-            onSelectTarget={setActiveTarget}
-          />
-        )}
       </div>
     </div>
   );
