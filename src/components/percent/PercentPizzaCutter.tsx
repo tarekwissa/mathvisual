@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Check, Edit3 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, Check, Edit3, Maximize2, Minimize2 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentPizzaCutter: React.FC = () => {
@@ -7,6 +7,33 @@ export const PercentPizzaCutter: React.FC = () => {
   const [selectedSlices, setSelectedSlices] = useState<number>(1);
   const [pizzaGrundwert, setPizzaGrundwert] = useState<number>(400); // 400 g
   const [unit, setUnit] = useState<string>('Gramm');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleFullscreen = () => {
+    sounds.playPop();
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   const fractionPercent = (selectedSlices / totalSlices) * 100;
   const decimal = (selectedSlices / totalSlices).toFixed(2);
@@ -28,7 +55,14 @@ export const PercentPizzaCutter: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div
+      ref={containerRef}
+      className={`bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-slate-950 p-6 sm:p-10 overflow-y-auto w-screen h-screen rounded-none'
+          : ''
+      }`}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -44,27 +78,42 @@ export const PercentPizzaCutter: React.FC = () => {
           </p>
         </div>
 
-        {/* Slice Preset Options */}
-        <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-medium">
-          {[
-            { n: 2, label: 'Halbieren (in 2)' },
-            { n: 4, label: 'Vierteln (in 4)' },
-            { n: 5, label: 'Fünfteln (in 5)' },
-            { n: 8, label: 'Achteln (in 8)' },
-            { n: 10, label: 'Zehnteln (in 10)' }
-          ].map((item) => (
-            <button
-              key={item.n}
-              onClick={() => handlePresetSelect(item.n)}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                totalSlices === item.n
-                  ? 'bg-rose-600 text-white font-bold shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Slice Preset Options */}
+          <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-medium">
+            {[
+              { n: 2, label: 'Halbieren (in 2)' },
+              { n: 4, label: 'Vierteln (in 4)' },
+              { n: 5, label: 'Fünfteln (in 5)' },
+              { n: 8, label: 'Achteln (in 8)' },
+              { n: 10, label: 'Zehnteln (in 10)' }
+            ].map((item) => (
+              <button
+                key={item.n}
+                onClick={() => handlePresetSelect(item.n)}
+                className={`px-3 py-1.5 rounded-xl transition-all ${
+                  totalSlices === item.n
+                    ? 'bg-rose-600 text-white font-bold shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className={`p-2.5 rounded-2xl border transition-all flex items-center justify-center shadow-lg ${
+              isFullscreen
+                ? 'bg-rose-500 border-rose-400 text-slate-950 font-bold'
+                : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title={isFullscreen ? 'Vollbildmodus beenden' : 'Vollbildmodus starten'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 

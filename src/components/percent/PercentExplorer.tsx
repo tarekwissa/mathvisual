@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Percent100GridTutor } from './Percent100GridTutor';
 import { PercentGlassVisualizer } from './PercentGlassVisualizer';
 import { PercentPizzaCutter } from './PercentPizzaCutter';
 import { PercentRealWorldScenarios } from './PercentRealWorldScenarios';
-import { Percent, ChevronDown, Bot, GlassWater, Pizza, Tag } from 'lucide-react';
+import { Percent, ChevronDown, Bot, GlassWater, Pizza, Tag, Maximize2, Minimize2 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentExplorer: React.FC = () => {
   const [activeView, setActiveView] = useState<'grid_tutor' | 'glass' | 'pizza' | 'scenarios'>('grid_tutor');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const viewOptions = [
     { id: 'grid_tutor', label: '1. Die Hundertertafel (Didaktischer 8.-Klasse-Tutor)', icon: Bot },
@@ -16,9 +18,41 @@ export const PercentExplorer: React.FC = () => {
     { id: 'scenarios', label: '4. Reallife-Labor (Rabatt, MwSt, Trinkgeld)', icon: Tag }
   ];
 
+  const toggleFullscreen = () => {
+    sounds.playPop();
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Intro Hero Banner with Dropdown Selection */}
+    <div
+      ref={containerRef}
+      className={`space-y-8 max-w-7xl mx-auto px-4 sm:px-6 py-6 transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-slate-950 p-6 sm:p-10 overflow-y-auto w-screen h-screen rounded-none max-w-none'
+          : ''
+      }`}
+    >
+      {/* Intro Hero Banner with Dropdown Selection & Fullscreen Button */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/20 p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-1/3 -mb-8 w-64 h-64 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -33,31 +67,48 @@ export const PercentExplorer: React.FC = () => {
               Der Prozent-Erklärer
             </h1>
             <p className="mt-1 text-slate-300 max-w-2xl text-xs sm:text-sm leading-relaxed">
-              Vergiss trockene Formeln! Verstehe Prozentrechnung über die <strong>100er-Tafel</strong> und anschauliche Experimente:
+              Vergiss trockene Formeln! Wähle ein Lern-Modell und nutze den <strong>Vollbildmodus</strong> für den Unterricht:
             </p>
           </div>
 
-          {/* Model Selector Dropdown */}
-          <div className="relative min-w-[280px]">
-            <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1 font-semibold">
-              Lern-Modell wählen:
-            </label>
-            <div className="relative">
-              <select
-                value={activeView}
-                onChange={(e) => {
-                  sounds.playPop();
-                  setActiveView(e.target.value as any);
-                }}
-                className="w-full appearance-none bg-slate-950 border border-amber-500/40 hover:border-amber-400 rounded-2xl px-4 py-3 pr-10 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-400 cursor-pointer shadow-lg transition-all"
+          {/* Model Selector Dropdown & Fullscreen Toggle Button */}
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-[260px] sm:min-w-[280px]">
+              <label className="text-[10px] uppercase font-mono text-slate-400 block mb-1 font-semibold">
+                Lern-Modell wählen:
+              </label>
+              <div className="relative">
+                <select
+                  value={activeView}
+                  onChange={(e) => {
+                    sounds.playPop();
+                    setActiveView(e.target.value as any);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-amber-500/40 hover:border-amber-400 rounded-2xl px-4 py-3 pr-10 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-400 cursor-pointer shadow-lg transition-all"
+                >
+                  {viewOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3.5 top-4 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Global Fullscreen Button */}
+            <div className="self-end pb-0.5">
+              <button
+                onClick={toggleFullscreen}
+                className={`p-3 rounded-2xl border transition-all flex items-center justify-center shadow-lg ${
+                  isFullscreen
+                    ? 'bg-amber-500 border-amber-400 text-slate-950 font-bold'
+                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 hover:border-amber-500/50'
+                }`}
+                title={isFullscreen ? 'Vollbildmodus beenden (Esc)' : 'Vollbildmodus für den Unterricht starten (Fullscreen)'}
               >
-                {viewOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3.5 top-4 pointer-events-none" />
+                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>

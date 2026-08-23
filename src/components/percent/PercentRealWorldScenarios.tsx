@@ -1,9 +1,37 @@
-import React, { useState } from 'react';
-import { Tag, Receipt, Utensils, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Tag, Receipt, Utensils, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { MathRenderer } from '../common/MathRenderer';
+import { sounds } from '../../utils/soundEffects';
 
 export const PercentRealWorldScenarios: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'rabatt' | 'mwst' | 'trinkgeld'>('rabatt');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleFullscreen = () => {
+    sounds.playPop();
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Rabatt state
   const [originalPrice, setOriginalPrice] = useState<number>(80);
@@ -36,7 +64,14 @@ export const PercentRealWorldScenarios: React.FC = () => {
   const perPerson = peopleCount > 0 ? totalWithTip / peopleCount : totalWithTip;
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 shadow-xl">
+    <div
+      ref={containerRef}
+      className={`bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 shadow-xl transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-slate-950 p-6 sm:p-10 overflow-y-auto w-screen h-screen rounded-none'
+          : ''
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
@@ -50,19 +85,26 @@ export const PercentRealWorldScenarios: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-medium">
-          <button
-            onClick={() => setActiveTab('rabatt')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              activeTab === 'rabatt' ? 'bg-rose-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Tag className="w-3.5 h-3.5" />
-            Rabatt & Sale
-          </button>
-          <button
-            onClick={() => setActiveTab('mwst')}
+        <div className="flex items-center gap-2">
+          {/* Tab Buttons */}
+          <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-medium">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveTab('rabatt');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                activeTab === 'rabatt' ? 'bg-rose-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Rabatt & Sale
+            </button>
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setActiveTab('mwst');
+              }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
               activeTab === 'mwst' ? 'bg-indigo-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -71,7 +113,10 @@ export const PercentRealWorldScenarios: React.FC = () => {
             Mehrwertsteuer
           </button>
           <button
-            onClick={() => setActiveTab('trinkgeld')}
+            onClick={() => {
+              sounds.playPop();
+              setActiveTab('trinkgeld');
+            }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
               activeTab === 'trinkgeld' ? 'bg-amber-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -80,7 +125,21 @@ export const PercentRealWorldScenarios: React.FC = () => {
             Restaurant / Trinkgeld
           </button>
         </div>
+
+        {/* Fullscreen Button */}
+        <button
+          onClick={toggleFullscreen}
+          className={`p-2.5 rounded-2xl border transition-all flex items-center justify-center shadow-lg ${
+            isFullscreen
+              ? 'bg-rose-500 border-rose-400 text-slate-950 font-bold'
+              : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+          }`}
+          title={isFullscreen ? 'Vollbildmodus beenden' : 'Vollbildmodus starten'}
+        >
+          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
       </div>
+    </div>
 
       {/* Scenario 1: Rabatt & Sale */}
       {activeTab === 'rabatt' && (

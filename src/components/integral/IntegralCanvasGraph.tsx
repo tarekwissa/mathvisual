@@ -1,6 +1,7 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import type { RiemannRectangle } from '../../utils/mathParser';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play, Gauge } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import type { RiemannRectangle, KeyPoint } from '../../utils/mathParser';
+import { findKeyPointsInView } from '../../utils/mathParser';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play, Gauge, Grid, ChevronDown, Magnet } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export interface CompiledFunctionItem {
@@ -58,6 +59,13 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   const [yMin, setYMin] = useState<number>(-3);
   const [yMax, setYMax] = useState<number>(6);
 
+  // Grid step spacing configuration (Achsen-Schrittweiten)
+  const [gridSpacing, setGridSpacing] = useState<'equal_1' | 'equal_05' | 'equal_2' | 'equal_02' | 'auto'>('equal_1');
+
+  // Magnetic Snapping to Roots & Intersections Toggle
+  const [isMagneticSnap, setIsMagneticSnap] = useState<boolean>(true);
+  const [activeSnapInfo, setActiveSnapInfo] = useState<{ x: number; label: string; type: 'root' | 'intersection'; color: string } | null>(null);
+
   // Drawing Animation
   const [drawProgress, setDrawProgress] = useState<number>(1); // 0 to 1
   const [isDrawingAnim, setIsDrawingAnim] = useState<boolean>(false);
@@ -71,6 +79,11 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
   const primaryItem = functionsList.find((f) => f.id === primaryFunctionId) || functionsList[0];
   const secondItem = functionsList.find((f) => f.id === secondFunctionId);
+
+  // Compute key points (Nullstellen & Schnittpunkte)
+  const keyPoints = useMemo(() => {
+    return findKeyPointsInView(functionsList, xMin - 2, xMax + 2, 400);
+  }, [functionsList, xMin, xMax]);
 
   // Start animated point-draw effect
   const startDrawingAnimation = useCallback(() => {
@@ -246,21 +259,37 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // 1. Grid
+    // 1. Grid Step Calculation based on gridSpacing selection
     const spanX = xMax - xMin;
     const spanY = yMax - yMin;
 
     let xStep = 1;
-    if (spanX > 25) xStep = 5;
-    else if (spanX > 12) xStep = 2;
-    else if (spanX < 3) xStep = 0.2;
-    else if (spanX < 6) xStep = 0.5;
-
     let yStep = 1;
-    if (spanY > 25) yStep = 5;
-    else if (spanY > 12) yStep = 2;
-    else if (spanY < 3) yStep = 0.2;
-    else if (spanY < 6) yStep = 0.5;
+
+    if (gridSpacing === 'equal_1') {
+      xStep = 1;
+      yStep = 1;
+    } else if (gridSpacing === 'equal_05') {
+      xStep = 0.5;
+      yStep = 0.5;
+    } else if (gridSpacing === 'equal_2') {
+      xStep = 2;
+      yStep = 2;
+    } else if (gridSpacing === 'equal_02') {
+      xStep = 0.2;
+      yStep = 0.2;
+    } else {
+      // Auto dynamic scaling
+      if (spanX > 25) xStep = 5;
+      else if (spanX > 12) xStep = 2;
+      else if (spanX < 3) xStep = 0.2;
+      else if (spanX < 6) xStep = 0.5;
+
+      if (spanY > 25) yStep = 5;
+      else if (spanY > 12) yStep = 2;
+      else if (spanY < 3) yStep = 0.2;
+      else if (spanY < 6) yStep = 0.5;
+    }
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
@@ -441,7 +470,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         ctx.save();
         ctx.beginPath();
         ctx.lineWidth = 6;
-        ctx.strokeStyle = funcItem.color + '66'; // with alpha
+        ctx.strokeStyle = funcItem.color + '66';
         ctx.lineCap = 'round';
         ctx.moveTo(trailPoints[0].cx, trailPoints[0].cy);
         for (let j = 1; j < trailPoints.length; j++) {
@@ -470,7 +499,24 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       }
     });
 
-    // 6. Draw Antiderivative F(x) if active
+    // 6. Draw Key Points Markers (Nullstellen & Schnittpunkte)
+    keyPoints.forEach((kp) => {
+      const pt = mathToCanvas(kp.x, kp.y, width, height);
+      if (pt.cx < 0 || pt.cx > width || pt.cy < 0 || pt.cy > height) return;
+
+      // Small diamond marker
+      ctx.save();
+      ctx.translate(pt.cx, pt.cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = kp.type === 'root' ? (kp.color || '#38bdf8') : '#e879f9';
+      ctx.fillRect(-3.5, -3.5, 7, 7);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-3.5, -3.5, 7, 7);
+      ctx.restore();
+    });
+
+    // 7. Draw Antiderivative F(x) if active
     if (showAntiderivative && antiderivativeFn) {
       ctx.beginPath();
       ctx.lineWidth = 2.5;
@@ -496,31 +542,40 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.setLineDash([]);
     }
 
-    // 7. Integration Boundary Markers (a and b)
+    // 8. Integration Boundary Markers (a and b)
     const drawBoundaryLine = (val: number, label: string, color: string) => {
       const ptX = mathToCanvas(val, 0, width, height).cx;
 
+      // Check if this boundary matches a key point
+      const matchedKeyPoint = keyPoints.find((kp) => Math.abs(kp.x - val) < 0.01);
+
       ctx.beginPath();
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = matchedKeyPoint ? 3.5 : 2.5;
       ctx.strokeStyle = color;
-      ctx.setLineDash([5, 5]);
+      ctx.setLineDash(matchedKeyPoint ? [] : [5, 5]);
       ctx.moveTo(ptX, 0);
       ctx.lineTo(ptX, height);
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Top Tag Badge
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.roundRect(ptX - 22, 10, 44, 24, 7);
+      const badgeText = matchedKeyPoint
+        ? `🧲 ${label}=${val.toLocaleString('de-DE', { maximumFractionDigits: 3 })}`
+        : `${label}=${val.toFixed(2)}`;
+      const badgeWidth = matchedKeyPoint ? 85 : 55;
+      ctx.roundRect(ptX - badgeWidth / 2, 10, badgeWidth, 24, 8);
       ctx.fill();
 
       ctx.fillStyle = '#090d16';
-      ctx.font = 'bold 12px Fira Code, monospace';
+      ctx.font = 'bold 11px Fira Code, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${label}=${val.toFixed(1)}`, ptX, 26);
+      ctx.fillText(badgeText, ptX, 26);
 
+      // Bottom / Axis Knob Point
       ctx.beginPath();
-      ctx.arc(ptX, origin.cy, 7, 0, Math.PI * 2);
+      ctx.arc(ptX, origin.cy, matchedKeyPoint ? 9 : 7, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
@@ -531,7 +586,24 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     drawBoundaryLine(a, 'a', '#34d399');
     drawBoundaryLine(b, 'b', '#fbbf24');
 
-    // 8. Live Accumulator marker for HDI
+    // 9. Active Snap Floating Notification Overlay
+    if (activeSnapInfo) {
+      const snapPt = mathToCanvas(activeSnapInfo.x, 0, width, height);
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.roundRect(snapPt.cx - 90, 42, 180, 26, 8);
+      ctx.fill();
+      ctx.strokeStyle = activeSnapInfo.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🧲 ${activeSnapInfo.label}`, snapPt.cx, 58);
+    }
+
+    // 10. Live Accumulator marker for HDI
     if (mode === 'hdi_accumulator' && xAccumulator !== undefined && primaryItem) {
       const accX = mathToCanvas(xAccumulator, 0, width, height).cx;
       const accY = mathToCanvas(xAccumulator, primaryItem.fn(xAccumulator), width, height).cy;
@@ -552,7 +624,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.stroke();
     }
 
-    // 9. Multi-Function Hover Crosshair & Values
+    // 11. Multi-Function Hover Crosshair & Values
     if (hoveredX) {
       ctx.beginPath();
       ctx.lineWidth = 1;
@@ -564,9 +636,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.setLineDash([]);
 
       functionsList.forEach((f) => {
-        if (!f.isVisible || !f.isValid) return;
+        if (!f.isVisible || !f.isValid) return null;
         const curY = f.fn(hoveredX.mathX);
-        if (isFinite(curY) && !isNaN(curY)) {
+        if (!isFinite(curY) && !isNaN(curY)) {
           const pt = mathToCanvas(hoveredX.mathX, curY, width, height);
           ctx.beginPath();
           ctx.arc(pt.cx, pt.cy, 5, 0, Math.PI * 2);
@@ -591,6 +663,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     xMax,
     yMin,
     yMax,
+    gridSpacing,
+    keyPoints,
+    activeSnapInfo,
     mathToCanvas,
     areaType,
     riemannType,
@@ -604,7 +679,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     isDrawingAnim
   ]);
 
-  // Handle Mouse Dragging / Pan
+  // Handle Mouse Dragging / Pan with Magnetic Snap
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -653,12 +728,49 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
     const mathPt = canvasToMath(mouseX, mouseY, width, height);
 
-    if (draggingMode === 'a') {
-      const newA = parseFloat(mathPt.mx.toFixed(1));
-      onUpdateBounds(newA, b);
-    } else if (draggingMode === 'b') {
-      const newB = parseFloat(mathPt.mx.toFixed(1));
-      onUpdateBounds(a, newB);
+    if (draggingMode === 'a' || draggingMode === 'b') {
+      let targetX = mathPt.mx;
+
+      // Magnetic Snapping check: test proximity to any key point in pixel distance
+      if (isMagneticSnap) {
+        let nearestKP: KeyPoint | null = null;
+        let minPixelDist = Infinity;
+
+        keyPoints.forEach((kp) => {
+          const kpCanvasX = mathToCanvas(kp.x, 0, width, height).cx;
+          const dist = Math.abs(kpCanvasX - mouseX);
+          if (dist < 18 && dist < minPixelDist) {
+            minPixelDist = dist;
+            nearestKP = kp;
+          }
+        });
+
+        if (nearestKP) {
+          const kp = nearestKP as KeyPoint;
+          targetX = kp.x;
+          if (!activeSnapInfo || activeSnapInfo.x !== kp.x) {
+            sounds.playPop();
+            setActiveSnapInfo({
+              x: kp.x,
+              label: kp.label,
+              type: kp.type,
+              color: kp.type === 'root' ? (kp.color || '#38bdf8') : '#e879f9'
+            });
+          }
+        } else {
+          setActiveSnapInfo(null);
+          targetX = parseFloat(targetX.toFixed(2));
+        }
+      } else {
+        targetX = parseFloat(targetX.toFixed(2));
+        setActiveSnapInfo(null);
+      }
+
+      if (draggingMode === 'a') {
+        onUpdateBounds(targetX, b);
+      } else {
+        onUpdateBounds(a, targetX);
+      }
     } else if (draggingMode === 'acc' && onUpdateAccumulator) {
       const newAcc = parseFloat(mathPt.mx.toFixed(2));
       onUpdateAccumulator(newAcc);
@@ -677,6 +789,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   const handleMouseUp = () => {
     setDraggingMode(null);
     setPanStart(null);
+    setActiveSnapInfo(null);
   };
 
   return (
@@ -698,6 +811,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           setDraggingMode(null);
           setPanStart(null);
           setHoveredX(null);
+          setActiveSnapInfo(null);
         }}
         className={`w-full h-full touch-none select-none ${
           draggingMode === 'pan' ? 'cursor-grabbing' : 'cursor-crosshair'
@@ -728,6 +842,48 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           <Gauge className="w-3.5 h-3.5 text-indigo-400" />
           <span>{drawSpeed === 'slow' ? 'Langsam (4.5s)' : drawSpeed === 'fast' ? 'Schnell (1.5s)' : 'Gemächlich (3.2s)'}</span>
         </button>
+
+        {/* Magnetic Snap Toggle */}
+        <button
+          onClick={() => {
+            sounds.playPop();
+            setIsMagneticSnap(!isMagneticSnap);
+          }}
+          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+            isMagneticSnap
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+              : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+          }`}
+          title="Magnetisches Einrasten an Nullstellen und Schnittpunkten umschalten"
+        >
+          <Magnet className="w-3.5 h-3.5 text-amber-400" />
+          <span>Magnet: {isMagneticSnap ? 'AN' : 'AUS'}</span>
+        </button>
+
+        <div className="w-[1px] h-5 bg-slate-700 mx-1 hidden sm:block" />
+
+        {/* Grid Spacing Selector Dropdown */}
+        <div className="relative flex items-center">
+          <div className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-700/90 rounded-xl px-2.5 py-1.5 border border-slate-700 text-xs font-mono text-cyan-300 cursor-pointer">
+            <Grid className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <select
+              value={gridSpacing}
+              onChange={(e) => {
+                sounds.playPop();
+                setGridSpacing(e.target.value as any);
+              }}
+              className="appearance-none bg-transparent text-slate-200 text-xs font-mono font-semibold focus:outline-none cursor-pointer pr-4"
+              title="Achsen-Schrittweiten / Rasterabstand einstellen"
+            >
+              <option value="equal_1" className="bg-slate-900 text-white">Ganze Schritte (1.0)</option>
+              <option value="equal_05" className="bg-slate-900 text-white">Halbschritte (0.5)</option>
+              <option value="equal_2" className="bg-slate-900 text-white">Zweierschritte (2.0)</option>
+              <option value="equal_02" className="bg-slate-900 text-white">Feinraster (0.2)</option>
+              <option value="auto" className="bg-slate-900 text-white">Auto (Dynamisch)</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+          </div>
+        </div>
 
         <div className="w-[1px] h-5 bg-slate-700 mx-1 hidden sm:block" />
 
@@ -803,9 +959,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           Klicken & Ziehen zum Verschieben
         </span>
         <span>•</span>
-        <span>Mausrad zum Zoomen</span>
+        <span className="text-amber-300 font-semibold">🧲 Grenzen rasten an Nullstellen ein</span>
         <span>•</span>
-        <span>🟢 [a] & 🟡 [b] für Grenzen</span>
+        <span>🟢 [a] & 🟡 [b] verschieben</span>
       </div>
     </div>
   );

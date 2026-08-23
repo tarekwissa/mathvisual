@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Bot,
@@ -8,7 +8,9 @@ import {
   ArrowLeft,
   ChevronDown,
   X,
-  Sparkles
+  Sparkles,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
@@ -35,6 +37,35 @@ export const Percent100GridTutor: React.FC = () => {
   // Interactive Zoom / Focus on a specific cell for classroom display
   const [zoomedCell, setZoomedCell] = useState<number | null>(null);
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleFullscreen = () => {
+    sounds.playPop();
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Compute calculated values based on type
   const calculatedValues = useMemo(() => {
@@ -148,8 +179,15 @@ export const Percent100GridTutor: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto px-4 sm:px-6 py-4">
-      {/* Top Banner: Dropdown Selector & Slide Pills */}
+    <div
+      ref={containerRef}
+      className={`space-y-6 max-w-5xl mx-auto px-4 sm:px-6 py-4 transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-slate-950 p-6 sm:p-10 overflow-y-auto w-screen h-screen rounded-none max-w-none'
+          : ''
+      }`}
+    >
+      {/* Top Banner: Dropdown Selector, Fullscreen Button & Slide Pills */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -162,19 +200,34 @@ export const Percent100GridTutor: React.FC = () => {
             </div>
           </div>
 
-          {/* Aufgabentyp Dropdown */}
-          <div className="relative min-w-[260px]">
-            <select
-              value={selectedType}
-              onChange={(e) => handleTypeDropdownChange(e.target.value as any)}
-              className="w-full appearance-none bg-slate-950 border border-amber-500/50 hover:border-amber-400 rounded-2xl px-4 py-2.5 pr-10 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-400 cursor-pointer shadow-lg transition-all"
+          <div className="flex items-center gap-2">
+            {/* Aufgabentyp Dropdown */}
+            <div className="relative min-w-[240px] sm:min-w-[260px]">
+              <select
+                value={selectedType}
+                onChange={(e) => handleTypeDropdownChange(e.target.value as any)}
+                className="w-full appearance-none bg-slate-950 border border-amber-500/50 hover:border-amber-400 rounded-2xl px-4 py-2.5 pr-10 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-400 cursor-pointer shadow-lg transition-all"
+              >
+                <option value="typeA">Typ A: Prozentwert (p % von G)</option>
+                <option value="typeB">Typ B: Grundwert (p % sind W)</option>
+                <option value="typeC">Typ C: Prozentsatz (W von G)</option>
+                <option value="free">✨ Freies Labor (Schieberegler)</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3.5 top-3.5 pointer-events-none" />
+            </div>
+
+            {/* Model Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              className={`p-2.5 rounded-2xl border transition-all flex items-center justify-center shadow-lg ${
+                isFullscreen
+                  ? 'bg-amber-500 border-amber-400 text-slate-950 font-bold'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title={isFullscreen ? 'Vollbildmodus beenden (Esc)' : 'Vollbildmodus starten (Fullscreen)'}
             >
-              <option value="typeA">Typ A: Prozentwert (p % von G)</option>
-              <option value="typeB">Typ B: Grundwert (p % sind W)</option>
-              <option value="typeC">Typ C: Prozentsatz (W von G)</option>
-              <option value="free">✨ Freies Labor (Schieberegler)</option>
-            </select>
-            <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3.5 top-3.5 pointer-events-none" />
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 

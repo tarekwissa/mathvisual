@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GlassWater, BatteryMedium, Sparkles, Droplets, Edit3 } from 'lucide-react';
+import { GlassWater, BatteryMedium, Sparkles, Droplets, Edit3, Maximize2, Minimize2 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentGlassVisualizer: React.FC = () => {
@@ -7,6 +7,33 @@ export const PercentGlassVisualizer: React.FC = () => {
   const [unit, setUnit] = useState<string>('ml');
   const [fillPercent, setFillPercent] = useState<number>(40); // 40%
   const [mode, setMode] = useState<'water' | 'battery'>('water');
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleFullscreen = () => {
+    sounds.playPop();
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Animation frame for undulating water waves
   const [wavePhase, setWavePhase] = useState<number>(0);
@@ -93,7 +120,14 @@ export const PercentGlassVisualizer: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div
+      ref={containerRef}
+      className={`bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-slate-950 p-6 sm:p-10 overflow-y-auto w-screen h-screen rounded-none'
+          : ''
+      }`}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -110,33 +144,48 @@ export const PercentGlassVisualizer: React.FC = () => {
           </p>
         </div>
 
-        {/* Mode switcher */}
-        <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-medium">
+        <div className="flex items-center gap-2">
+          {/* Mode switcher */}
+          <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-medium">
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setMode('water');
+                setUnit('ml');
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
+                mode === 'water' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <GlassWater className="w-4 h-4" />
+              Flüssigkeit
+            </button>
+            <button
+              onClick={() => {
+                sounds.playPop();
+                setMode('battery');
+                setUnit('mAh');
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
+                mode === 'battery' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BatteryMedium className="w-4 h-4" />
+              Akku
+            </button>
+          </div>
+
+          {/* Fullscreen button */}
           <button
-            onClick={() => {
-              sounds.playPop();
-              setMode('water');
-              setUnit('ml');
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
-              mode === 'water' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+            onClick={toggleFullscreen}
+            className={`p-2.5 rounded-2xl border transition-all flex items-center justify-center shadow-lg ${
+              isFullscreen
+                ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-bold'
+                : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
             }`}
+            title={isFullscreen ? 'Vollbildmodus beenden' : 'Vollbildmodus starten'}
           >
-            <GlassWater className="w-4 h-4" />
-            Flüssigkeit
-          </button>
-          <button
-            onClick={() => {
-              sounds.playPop();
-              setMode('battery');
-              setUnit('mAh');
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all ${
-              mode === 'battery' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <BatteryMedium className="w-4 h-4" />
-            Akku
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </div>

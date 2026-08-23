@@ -277,3 +277,73 @@ export function findRootsInInterval(
 
   return Array.from(new Set(roots)).sort((x, y) => x - y);
 }
+
+export interface KeyPoint {
+  x: number;
+  y: number;
+  type: 'root' | 'intersection';
+  label: string;
+  funcName: string;
+  color?: string;
+}
+
+/**
+ * Finds all critical key points (Nullstellen, Schnittpunkte)
+ * within [xMin, xMax] for a list of compiled functions
+ */
+export function findKeyPointsInView(
+  functionsList: { id: string; name: string; fn: (x: number) => number; isVisible: boolean; isValid: boolean; color: string }[],
+  xMin: number = -10,
+  xMax: number = 10,
+  samples: number = 300
+): KeyPoint[] {
+  const points: KeyPoint[] = [];
+  const activeFuncs = functionsList.filter((f) => f.isVisible && f.isValid);
+
+  // 1. Nullstellen (Roots) for each active function
+  activeFuncs.forEach((f) => {
+    const roots = findRootsInInterval(f.fn, xMin, xMax, samples);
+    roots.forEach((rx) => {
+      points.push({
+        x: rx,
+        y: 0,
+        type: 'root',
+        label: `Nullstelle von ${f.name} (x ≈ ${rx.toLocaleString('de-DE', { maximumFractionDigits: 3 })})`,
+        funcName: f.name,
+        color: f.color
+      });
+    });
+  });
+
+  // 2. Schnittpunkte (Intersections) between pairs of active functions
+  for (let i = 0; i < activeFuncs.length; i++) {
+    for (let j = i + 1; j < activeFuncs.length; j++) {
+      const f1 = activeFuncs[i];
+      const f2 = activeFuncs[j];
+      const diffFn = (x: number) => f1.fn(x) - f2.fn(x);
+      const intersectionX = findRootsInInterval(diffFn, xMin, xMax, samples);
+      intersectionX.forEach((ix) => {
+        const iy = parseFloat(f1.fn(ix).toFixed(4));
+        points.push({
+          x: ix,
+          y: isFinite(iy) ? iy : 0,
+          type: 'intersection',
+          label: `Schnittpunkt ${f1.name} ∩ ${f2.name} (x ≈ ${ix.toLocaleString('de-DE', { maximumFractionDigits: 3 })})`,
+          funcName: `${f1.name} ∩ ${f2.name}`,
+          color: '#e879f9'
+        });
+      });
+    }
+  }
+
+  // Deduplicate points within epsilon = 0.005
+  const uniquePoints: KeyPoint[] = [];
+  points.sort((p1, p2) => p1.x - p2.x);
+  for (const pt of points) {
+    if (!uniquePoints.some((u) => Math.abs(u.x - pt.x) < 0.005 && u.type === pt.type)) {
+      uniquePoints.push(pt);
+    }
+  }
+
+  return uniquePoints;
+}

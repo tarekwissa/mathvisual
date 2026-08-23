@@ -9,10 +9,11 @@ import {
   compileMathExpression,
   computeDefiniteIntegral,
   computeRiemannSum,
-  findRootsInInterval
+  findRootsInInterval,
+  findKeyPointsInView
 } from '../../utils/mathParser';
 import { MathRenderer } from '../common/MathRenderer';
-import { Sigma, Plus, Minus, Edit3, Trash2, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Sigma, Plus, Minus, Edit3, Trash2, Eye, EyeOff, ChevronDown, Magnet } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 const PALETTE = [
@@ -115,6 +116,11 @@ export const IntegralExplorer: React.FC = () => {
     if (!primaryItem || !primaryItem.isValid) return [];
     return findRootsInInterval(primaryItem.fn, a, b);
   }, [primaryItem, a, b]);
+
+  // All key points (Nullstellen & Schnittpunkte) for magnetic quick-snapping
+  const allKeyPoints = useMemo(() => {
+    return findKeyPointsInView(compiledFunctions, -10, 10, 400);
+  }, [compiledFunctions]);
 
   // Numeric antiderivative
   const antiderivativeFn = useMemo(() => {
@@ -467,67 +473,136 @@ export const IntegralExplorer: React.FC = () => {
       {/* Main Canvas Graph Section */}
       <div className="space-y-4">
         {/* Interactive Controls Bar for Bounds */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 items-center">
-          {/* Lower bound a */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-emerald-400 font-mono font-bold">
-              <span>Untere Grenze (a):</span>
-              <span>{a}</span>
+        <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
+            {/* Lower bound a */}
+            <div className="space-y-1 bg-slate-950 p-2.5 rounded-xl border border-emerald-500/30">
+              <div className="flex justify-between items-center text-xs text-emerald-400 font-mono font-bold">
+                <span>Grenze (a):</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={a}
+                  onChange={(e) => setA(Number(e.target.value))}
+                  className="w-20 bg-slate-900 border border-emerald-500/40 rounded px-1.5 py-0.5 text-right text-emerald-300 font-bold focus:outline-none"
+                />
+              </div>
+              <input
+                type="range"
+                min="-6"
+                max="6"
+                step="0.05"
+                value={a}
+                onChange={(e) => setA(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+              />
             </div>
-            <input
-              type="range"
-              min="-5"
-              max="5"
-              step="0.1"
-              value={a}
-              onChange={(e) => setA(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-            />
+
+            {/* Upper bound b */}
+            <div className="space-y-1 bg-slate-950 p-2.5 rounded-xl border border-amber-500/30">
+              <div className="flex justify-between items-center text-xs text-amber-400 font-mono font-bold">
+                <span>Grenze (b):</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={b}
+                  onChange={(e) => setB(Number(e.target.value))}
+                  className="w-20 bg-slate-900 border border-amber-500/40 rounded px-1.5 py-0.5 text-right text-amber-300 font-bold focus:outline-none"
+                />
+              </div>
+              <input
+                type="range"
+                min="-6"
+                max="6"
+                step="0.05"
+                value={b}
+                onChange={(e) => setB(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+              />
+            </div>
+
+            {/* Area Type Dropdown (Signed vs Absolute) */}
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-mono block">Fläche:</label>
+              <div className="relative">
+                <select
+                  value={areaType}
+                  onChange={(e) => setAreaType(e.target.value as any)}
+                  className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-8 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-400 cursor-pointer"
+                >
+                  <option value="signed">Flächenbilanz (±)</option>
+                  <option value="absolute">Geometrisch (|A|)</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Antiderivative Toggle */}
+            <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="text-xs text-slate-300 font-medium">Stammfunktion F(x)</span>
+              <input
+                type="checkbox"
+                checked={showAntiderivative || activeMode === 'hdi_accumulator'}
+                onChange={(e) => setShowAntiderivative(e.target.checked)}
+                className="w-4 h-4 rounded text-purple-600 bg-slate-800 border-slate-700 cursor-pointer accent-purple-500"
+              />
+            </div>
           </div>
 
-          {/* Upper bound b */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-amber-400 font-mono font-bold">
-              <span>Obere Grenze (b):</span>
-              <span>{b}</span>
+          {/* Magnetic Quick-Snap Badges for Detected Nullstellen & Schnittpunkte */}
+          {allKeyPoints.length > 0 && (
+            <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-mono text-amber-400 font-bold flex items-center gap-1">
+                <Magnet className="w-3.5 h-3.5 text-amber-400" />
+                Spezielle Punkte treffen:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {allKeyPoints.slice(0, 8).map((kp, idx) => (
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800 text-[11px] font-mono shadow-sm"
+                  >
+                    <span
+                      className="font-bold truncate max-w-[120px]"
+                      style={{ color: kp.type === 'root' ? (kp.color || '#38bdf8') : '#e879f9' }}
+                    >
+                      {kp.type === 'root' ? `Nullst. ${kp.funcName}` : `Schnitt ${kp.funcName}`}: {kp.x.toLocaleString('de-DE', { maximumFractionDigits: 3 })}
+                    </span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <button
+                        onClick={() => {
+                          sounds.playPop();
+                          setA(kp.x);
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                          Math.abs(a - kp.x) < 0.005
+                            ? 'bg-emerald-500 text-slate-950 font-extrabold'
+                            : 'bg-slate-900 text-emerald-400 hover:bg-emerald-600 hover:text-white'
+                        }`}
+                        title={`Untere Grenze a auf ${kp.x} setzen`}
+                      >
+                        a
+                      </button>
+                      <button
+                        onClick={() => {
+                          sounds.playPop();
+                          setB(kp.x);
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                          Math.abs(b - kp.x) < 0.005
+                            ? 'bg-amber-500 text-slate-950 font-extrabold'
+                            : 'bg-slate-900 text-amber-400 hover:bg-amber-600 hover:text-white'
+                        }`}
+                        title={`Obere Grenze b auf ${kp.x} setzen`}
+                      >
+                        b
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <input
-              type="range"
-              min="-5"
-              max="5"
-              step="0.1"
-              value={b}
-              onChange={(e) => setB(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
-            />
-          </div>
-
-          {/* Area Type Dropdown (Signed vs Absolute) */}
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-mono block">Fläche:</label>
-            <div className="relative">
-              <select
-                value={areaType}
-                onChange={(e) => setAreaType(e.target.value as any)}
-                className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-slate-300 focus:outline-none focus:border-indigo-400 cursor-pointer"
-              >
-                <option value="signed">Flächenbilanz (±)</option>
-                <option value="absolute">Geometrisch (|A|)</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Antiderivative Toggle */}
-          <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-xs text-slate-300 font-medium">Stammfunktion F(x)</span>
-            <input
-              type="checkbox"
-              checked={showAntiderivative || activeMode === 'hdi_accumulator'}
-              onChange={(e) => setShowAntiderivative(e.target.checked)}
-              className="w-4 h-4 rounded text-purple-600 bg-slate-800 border-slate-700 cursor-pointer accent-purple-500"
-            />
-          </div>
+          )}
         </div>
 
         {/* The Live Multi-Function Canvas Graph */}
