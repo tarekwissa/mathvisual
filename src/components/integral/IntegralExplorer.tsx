@@ -13,7 +13,7 @@ import {
   findKeyPointsInView
 } from '../../utils/mathParser';
 import { MathRenderer } from '../common/MathRenderer';
-import { Sigma, Plus, Minus, Edit3, Trash2, Eye, EyeOff, ChevronDown, Magnet } from 'lucide-react';
+import { Sigma, Plus, Edit3, Trash2, Eye, EyeOff, ChevronDown, Magnet } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 const PALETTE = [
@@ -179,14 +179,6 @@ export const IntegralExplorer: React.FC = () => {
         isVisible: true
       };
       setFunctions([...functions, newFunc]);
-    }
-  };
-
-  const handleUpdateN = (newN: number) => {
-    const clamped = Math.max(1, Math.min(200, newN));
-    setRiemannN(clamped);
-    if (Math.random() < 0.25) {
-      sounds.playPop();
     }
   };
 
@@ -364,107 +356,60 @@ export const IntegralExplorer: React.FC = () => {
         </div>
       </div>
 
-      {/* Direct Riemann Rectangle Controller in Riemann Mode */}
+      {/* Direct Riemann Rectangle Controller in Riemann Mode (Compact Side-by-Side Dropdowns) */}
       {activeMode === 'riemann' && (
-        <div className="bg-slate-900/90 border border-blue-500/40 rounded-2xl p-5 shadow-xl space-y-4 animate-fadeIn">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="p-1 bg-blue-500/20 text-blue-400 rounded-md text-[10px] font-mono uppercase font-bold">
-                  Rechtecke konfigurieren
-                </span>
-                <span className="text-white font-bold text-base">
-                  Anzahl der Riemann-Streifen (n):
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Stelle die Streifenanzahl beliebig ein. Je mehr Rechtecke, desto exakter nähert sich die Summe dem Integral an!
-              </p>
-            </div>
+        <div className="bg-slate-900/90 border border-blue-500/40 rounded-2xl px-4 py-3 shadow-lg flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="p-1 bg-blue-500/20 text-blue-400 rounded-md text-[10px] font-mono uppercase font-bold">
+              Riemann-Summen
+            </span>
+            <span className="text-white font-bold text-xs sm:text-sm">
+              Streifen-Konfiguration:
+            </span>
+          </div>
 
-            {/* Direct Number Input & Stepper Controls */}
+          <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+            {/* 1. Number of Stripes Dropdown */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleUpdateN(riemannN - 1)}
-                className="p-2 rounded-xl bg-slate-950 text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-800 transition-all"
-                title="1 Rechteck weniger"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <div className="flex items-center bg-slate-950 px-3 py-1.5 rounded-xl border border-blue-500/50">
-                <span className="text-xs text-slate-400 font-mono mr-2 font-bold">n =</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="200"
+              <span className="text-slate-300 font-semibold">Anzahl Streifen (n):</span>
+              <div className="relative">
+                <select
                   value={riemannN}
-                  onChange={(e) => handleUpdateN(Number(e.target.value))}
-                  className="w-16 bg-transparent text-blue-300 font-mono font-bold text-base focus:outline-none text-center"
-                />
-              </div>
-              <button
-                onClick={() => handleUpdateN(riemannN + 1)}
-                className="p-2 rounded-xl bg-slate-950 text-slate-300 hover:text-white border border-slate-700 hover:bg-slate-800 transition-all"
-                title="1 Rechteck mehr"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Slider and Fast Preset Buttons */}
-          <div className="space-y-2">
-            <input
-              type="range"
-              min="1"
-              max="150"
-              value={riemannN}
-              onChange={(e) => handleUpdateN(Number(e.target.value))}
-              className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-400"
-            />
-
-            {/* Quick n presets */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <span className="text-xs text-slate-500 font-mono">Schnell-Auswahl:</span>
-              <div className="flex flex-wrap gap-1.5 text-xs font-mono">
-                {[1, 2, 4, 8, 16, 32, 50, 100].map((presetN) => (
-                  <button
-                    key={presetN}
-                    onClick={() => {
-                      sounds.playPop();
-                      setRiemannN(presetN);
-                    }}
-                    className={`px-3 py-1 rounded-xl border transition-all ${
-                      riemannN === presetN
-                        ? 'bg-blue-600 border-blue-400 text-white font-bold shadow'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    n = {presetN}
-                  </button>
-                ))}
+                  onChange={(e) => {
+                    sounds.playPop();
+                    setRiemannN(Number(e.target.value));
+                  }}
+                  className="appearance-none bg-slate-950 border border-blue-500/50 hover:border-blue-400 rounded-xl px-3 py-1.5 pr-8 text-blue-300 font-bold focus:outline-none focus:border-blue-400 cursor-pointer shadow-sm"
+                >
+                  {[1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32, 50, 64, 100, 150, 200].map((nVal) => (
+                    <option key={nVal} value={nVal}>
+                      {nVal} {nVal === 1 ? 'Streifen' : 'Streifen'}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-blue-400 absolute right-2.5 top-2.5 pointer-events-none" />
               </div>
             </div>
-          </div>
 
-          {/* Riemann Type Picker */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
-            <span className="text-xs text-slate-400 font-mono mr-1">Methode:</span>
-            <div className="relative">
-              <select
-                value={riemannType}
-                onChange={(e) => {
-                  sounds.playPop();
-                  setRiemannType(e.target.value as any);
-                }}
-                className="appearance-none bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-white focus:outline-none focus:border-indigo-400 cursor-pointer"
-              >
-                <option value="left">Links-Summe</option>
-                <option value="right">Rechts-Summe</option>
-                <option value="midpoint">Mittelpunkt-Summe</option>
-                <option value="trapezoid">Trapez-Regel</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+            {/* 2. Riemann Method Dropdown (Nebeneinander) */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-300 font-semibold">Methode:</span>
+              <div className="relative">
+                <select
+                  value={riemannType}
+                  onChange={(e) => {
+                    sounds.playPop();
+                    setRiemannType(e.target.value as any);
+                  }}
+                  className="appearance-none bg-slate-950 border border-slate-700 hover:border-indigo-400 rounded-xl px-3 py-1.5 pr-8 text-white font-semibold focus:outline-none focus:border-indigo-400 cursor-pointer shadow-sm"
+                >
+                  <option value="left">Links-Summe</option>
+                  <option value="right">Rechts-Summe</option>
+                  <option value="midpoint">Mittelpunkt-Summe</option>
+                  <option value="trapezoid">Trapez-Regel</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -673,7 +618,7 @@ export const IntegralExplorer: React.FC = () => {
             exactIntegral={signedIntegral}
             riemannSum={riemannSum}
             n={riemannN}
-            onUpdateN={handleUpdateN}
+            onUpdateN={setRiemannN}
             riemannType={riemannType}
             onUpdateType={setRiemannType}
             a={a}
