@@ -624,6 +624,11 @@ export const IntegralExplorer: React.FC = () => {
           xAccumulator={xAccumulator}
           onUpdateAccumulator={setXAccumulator}
           mode={activeMode}
+          signedIntegral={signedIntegral}
+          absoluteArea={absoluteArea}
+          areaBetween={areaBetween}
+          riemannSum={riemannSum}
+          rootsInInterval={roots}
         />
 
         {/* Live Calculation Scorecard */}

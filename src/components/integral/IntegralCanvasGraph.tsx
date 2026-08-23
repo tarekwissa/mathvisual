@@ -1,7 +1,20 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import type { RiemannRectangle, KeyPoint } from '../../utils/mathParser';
 import { findKeyPointsInView } from '../../utils/mathParser';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Move, Play, Gauge, Grid, ChevronDown, Magnet } from 'lucide-react';
+import {
+  Maximize2,
+  Minimize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Move,
+  Play,
+  Gauge,
+  Grid,
+  ChevronDown,
+  Magnet,
+  Crosshair
+} from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export interface CompiledFunctionItem {
@@ -29,6 +42,11 @@ interface IntegralCanvasGraphProps {
   xAccumulator?: number;
   onUpdateAccumulator?: (newX: number) => void;
   mode: 'single' | 'between' | 'riemann' | 'hdi_accumulator';
+  signedIntegral?: number;
+  absoluteArea?: number;
+  areaBetween?: number;
+  riemannSum?: number;
+  rootsInInterval?: number[];
 }
 
 export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
@@ -45,7 +63,12 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   antiderivativeFn,
   xAccumulator,
   onUpdateAccumulator,
-  mode
+  mode,
+  signedIntegral,
+  absoluteArea,
+  areaBetween,
+  riemannSum,
+  rootsInInterval = []
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -65,6 +88,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   // Magnetic Snapping to Roots & Intersections Toggle
   const [isMagneticSnap, setIsMagneticSnap] = useState<boolean>(true);
   const [activeSnapInfo, setActiveSnapInfo] = useState<{ x: number; label: string; type: 'root' | 'intersection'; color: string } | null>(null);
+
+  // Show/Hide Mouse Coordinates Toggle
+  const [showCoordinates, setShowCoordinates] = useState<boolean>(true);
 
   // Drawing Animation
   const [drawProgress, setDrawProgress] = useState<number>(1); // 0 to 1
@@ -624,8 +650,8 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.stroke();
     }
 
-    // 11. Multi-Function Hover Crosshair & Values
-    if (hoveredX) {
+    // 11. Multi-Function Hover Crosshair & Values (only when showCoordinates is true)
+    if (hoveredX && showCoordinates) {
       ctx.beginPath();
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
@@ -666,6 +692,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     gridSpacing,
     keyPoints,
     activeSnapInfo,
+    showCoordinates,
     mathToCanvas,
     areaType,
     riemannType,
@@ -860,6 +887,23 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           <span>Magnet: {isMagneticSnap ? 'AN' : 'AUS'}</span>
         </button>
 
+        {/* Show/Hide Mouse Coordinates Toggle */}
+        <button
+          onClick={() => {
+            sounds.playPop();
+            setShowCoordinates(!showCoordinates);
+          }}
+          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-mono transition-all ${
+            showCoordinates
+              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-bold'
+              : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+          }`}
+          title="Maus-Koordinaten und Fadenkreuz ein-/ausblenden"
+        >
+          <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Koordinaten: {showCoordinates ? 'AN' : 'AUS'}</span>
+        </button>
+
         <div className="w-[1px] h-5 bg-slate-700 mx-1 hidden sm:block" />
 
         {/* Grid Spacing Selector Dropdown */}
@@ -926,8 +970,8 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         </button>
       </div>
 
-      {/* Floating Multi-Function Tooltip */}
-      {hoveredX && (
+      {/* Floating Multi-Function Tooltip (only when showCoordinates is true) */}
+      {hoveredX && showCoordinates && (
         <div
           className="absolute pointer-events-none bg-slate-900/95 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-mono shadow-2xl backdrop-blur z-10 space-y-1"
           style={{
@@ -952,16 +996,67 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         </div>
       )}
 
-      {/* Control hints overlay */}
-      <div className="absolute bottom-3 left-4 text-[11px] text-slate-400 font-mono flex flex-wrap items-center gap-3 pointer-events-none bg-slate-950/85 backdrop-blur px-3.5 py-1.5 rounded-xl border border-slate-800/90 shadow-lg">
-        <span className="flex items-center gap-1">
+      {/* Bottom Live Area & Status Scorecard */}
+      <div className="absolute bottom-3 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none z-20">
+        {/* Left: Quick navigation hint */}
+        <div className="text-[11px] text-slate-400 font-mono hidden sm:flex items-center gap-2 bg-slate-950/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800/90 shadow-lg">
           <Move className="w-3.5 h-3.5 text-indigo-400" />
-          Klicken & Ziehen zum Verschieben
-        </span>
-        <span>•</span>
-        <span className="text-amber-300 font-semibold">🧲 Grenzen rasten an Nullstellen ein</span>
-        <span>•</span>
-        <span>🟢 [a] & 🟡 [b] verschieben</span>
+          <span>Ziehen: Verschieben</span>
+          <span>•</span>
+          <span className="text-amber-300">🧲 Magnet-Snap</span>
+        </div>
+
+        {/* Center / Right: Live Area Scorecard for Fullscreen & Class Presentations */}
+        <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
+          {/* Flächenbilanz */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 backdrop-blur border border-slate-800 shadow-lg text-xs font-mono">
+            <span className="text-slate-400">Flächenbilanz (∫):</span>
+            <span
+              className={`font-extrabold ${
+                (signedIntegral ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
+              {(signedIntegral ?? 0) > 0 ? '+' : ''}
+              {(signedIntegral ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+            </span>
+          </div>
+
+          {/* Geometrische Fläche */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 backdrop-blur border border-emerald-500/30 shadow-lg text-xs font-mono">
+            <span className="text-emerald-400 font-semibold">Geom. Fläche (|A|):</span>
+            <span className="font-extrabold text-white">
+              {(absoluteArea ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+            </span>
+            {rootsInInterval && rootsInInterval.length > 0 && (
+              <span className="text-[10px] text-amber-400 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 font-bold">
+                {rootsInInterval.length} {rootsInInterval.length === 1 ? 'Nullstelle' : 'Nullstellen'}
+              </span>
+            )}
+          </div>
+
+          {/* Mode: Between two functions */}
+          {mode === 'between' && areaBetween !== undefined && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 backdrop-blur border border-indigo-500/40 shadow-lg text-xs font-mono">
+              <span className="text-indigo-300 font-semibold">Fläche zw. Kurven:</span>
+              <span className="font-extrabold text-indigo-200">
+                {Math.abs(areaBetween).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+              </span>
+            </div>
+          )}
+
+          {/* Mode: Riemann sums */}
+          {mode === 'riemann' && riemannSum !== undefined && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 backdrop-blur border border-blue-500/40 shadow-lg text-xs font-mono">
+              <span className="text-blue-300 font-semibold">Riemann-Summe:</span>
+              <span className="font-extrabold text-white">
+                {riemannSum.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                (Δ = {Math.abs(riemannSum - (signedIntegral ?? 0)).toFixed(3)})
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
