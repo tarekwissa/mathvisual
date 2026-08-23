@@ -76,11 +76,11 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Math viewport coordinates
-  const [xMin, setXMin] = useState<number>(-4);
-  const [xMax, setXMax] = useState<number>(4);
-  const [yMin, setYMin] = useState<number>(-3);
-  const [yMax, setYMax] = useState<number>(6);
+  // Math viewport coordinates - initialized to balanced 1:1 ratio
+  const [xMin, setXMin] = useState<number>(-5);
+  const [xMax, setXMax] = useState<number>(5);
+  const [yMin, setYMin] = useState<number>(-2.8);
+  const [yMax, setYMax] = useState<number>(2.8);
 
   // Grid step spacing configuration (Achsen-Schrittweiten)
   const [gridSpacing, setGridSpacing] = useState<'equal_1' | 'equal_05' | 'equal_2' | 'equal_02' | 'auto'>('equal_1');
@@ -147,35 +147,67 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     startDrawingAnimation();
   }, [functionsList, startDrawingAnimation]);
 
-  // Auto-fit view to current integration bounds
+  // Initial & Reset View: 1:1 Orthonormal Aspect Ratio (1 unit on X = 1 unit on Y)
   const handleResetView = useCallback(() => {
     sounds.playPop();
-    const minBound = Math.min(a, b);
-    const maxBound = Math.max(a, b);
-    const span = Math.max(2, maxBound - minBound);
-    const margin = span * 0.5;
-
-    let minVal = -2;
-    let maxVal = 4;
-
-    if (primaryItem && primaryItem.isValid) {
-      const testPoints = 40;
-      for (let i = 0; i <= testPoints; i++) {
-        const curX = minBound - margin + (i / testPoints) * (span + 2 * margin);
-        const val = primaryItem.fn(curX);
-        if (isFinite(val) && !isNaN(val)) {
-          minVal = Math.min(minVal, val);
-          maxVal = Math.max(maxVal, val);
-        }
-      }
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = (rect.width > 0 && rect.height > 0) ? rect.width / rect.height : (16 / 9);
+      const spanX = 10;
+      const spanY = spanX / aspect;
+      setXMin(-5);
+      setXMax(5);
+      setYMin(parseFloat((-spanY / 2).toFixed(2)));
+      setYMax(parseFloat((spanY / 2).toFixed(2)));
+    } else {
+      setXMin(-5);
+      setXMax(5);
+      setYMin(-2.8);
+      setYMax(2.8);
     }
+  }, []);
 
-    const ySpan = Math.max(3, maxVal - minVal);
-    setXMin(parseFloat((minBound - margin).toFixed(1)));
-    setXMax(parseFloat((maxBound + margin).toFixed(1)));
-    setYMin(parseFloat((Math.min(-1, minVal - ySpan * 0.25)).toFixed(1)));
-    setYMax(parseFloat((Math.max(2, maxVal + ySpan * 0.25)).toFixed(1)));
-  }, [a, b, primaryItem]);
+  // Sync aspect ratio automatically on page load, mount, refresh, and resize
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const syncAspectRatio = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const aspect = rect.width / rect.height;
+        const currentSpanX = 10;
+        const newSpanY = currentSpanX / aspect;
+        setXMin(-5);
+        setXMax(5);
+        setYMin(parseFloat((-newSpanY / 2).toFixed(2)));
+        setYMax(parseFloat((newSpanY / 2).toFixed(2)));
+      }
+    };
+
+    // Run on initial mount / page load
+    const timer = setTimeout(syncAspectRatio, 50);
+
+    const observer = new ResizeObserver(() => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const aspect = rect.width / rect.height;
+        const currentSpanX = xMax - xMin;
+        const currentCenterY = (yMin + yMax) / 2;
+        const newSpanY = currentSpanX / aspect;
+        setYMin(parseFloat((currentCenterY - newSpanY / 2).toFixed(2)));
+        setYMax(parseFloat((currentCenterY + newSpanY / 2).toFixed(2)));
+      }
+    });
+
+    observer.observe(canvas);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [isFullscreen]);
 
   // Coordinate transforms
   const mathToCanvas = useCallback(
@@ -819,6 +851,158 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setActiveSnapInfo(null);
   };
 
+  // Touch handlers for Tablets, iPads and Touchscreens
+  const touchPinchDistRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    if (e.touches.length === 1) {
+      // 1 Finger: Boundary Drag or Pan
+      const touch = e.touches[0];
+      const clickX = touch.clientX - rect.left;
+      const clickY = touch.clientY - rect.top;
+      const width = rect.width;
+      const height = rect.height;
+
+      const ptA = mathToCanvas(a, 0, width, height).cx;
+      const ptB = mathToCanvas(b, 0, width, height).cx;
+
+      // Generous hit test for fingers on touch screens (36px radius)
+      if (Math.abs(clickX - ptA) < 36) {
+        setDraggingMode('a');
+        sounds.playPop();
+      } else if (Math.abs(clickX - ptB) < 36) {
+        setDraggingMode('b');
+        sounds.playPop();
+      } else if (mode === 'hdi_accumulator' && xAccumulator !== undefined) {
+        const ptAcc = mathToCanvas(xAccumulator, 0, width, height).cx;
+        if (Math.abs(clickX - ptAcc) < 36) {
+          setDraggingMode('acc');
+        }
+      } else {
+        setDraggingMode('pan');
+        const mathPt = canvasToMath(clickX, clickY, width, height);
+        setPanStart({
+          mx: mathPt.mx,
+          my: mathPt.my,
+          xMin,
+          xMax,
+          yMin,
+          yMax
+        });
+      }
+    } else if (e.touches.length === 2) {
+      // 2 Fingers: Pinch to Zoom
+      setDraggingMode(null);
+      setPanStart(null);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchPinchDistRef.current = dist;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      const mathPt = canvasToMath(touchX, touchY, width, height);
+
+      if (draggingMode === 'a' || draggingMode === 'b') {
+        let targetX = mathPt.mx;
+
+        if (isMagneticSnap) {
+          let nearestKP: KeyPoint | null = null;
+          let minPixelDist = Infinity;
+
+          keyPoints.forEach((kp) => {
+            const kpCanvasX = mathToCanvas(kp.x, 0, width, height).cx;
+            const dist = Math.abs(kpCanvasX - touchX);
+            if (dist < 26 && dist < minPixelDist) {
+              minPixelDist = dist;
+              nearestKP = kp;
+            }
+          });
+
+          if (nearestKP) {
+            const kp = nearestKP as KeyPoint;
+            targetX = kp.x;
+            if (!activeSnapInfo || activeSnapInfo.x !== kp.x) {
+              sounds.playPop();
+              setActiveSnapInfo({
+                x: kp.x,
+                label: kp.label,
+                type: kp.type,
+                color: kp.type === 'root' ? (kp.color || '#38bdf8') : '#e879f9'
+              });
+            }
+          } else {
+            setActiveSnapInfo(null);
+            targetX = parseFloat(targetX.toFixed(2));
+          }
+        } else {
+          targetX = parseFloat(targetX.toFixed(2));
+          setActiveSnapInfo(null);
+        }
+
+        if (draggingMode === 'a') {
+          onUpdateBounds(targetX, b);
+        } else {
+          onUpdateBounds(a, targetX);
+        }
+      } else if (draggingMode === 'acc' && onUpdateAccumulator) {
+        const newAcc = parseFloat(mathPt.mx.toFixed(2));
+        onUpdateAccumulator(newAcc);
+      } else if (draggingMode === 'pan' && panStart) {
+        const deltaX = mathPt.mx - panStart.mx;
+        const deltaY = mathPt.my - panStart.my;
+        setXMin(parseFloat((panStart.xMin - deltaX).toFixed(2)));
+        setXMax(parseFloat((panStart.xMax - deltaX).toFixed(2)));
+        setYMin(parseFloat((panStart.yMin - deltaY).toFixed(2)));
+        setYMax(parseFloat((panStart.yMax - deltaY).toFixed(2)));
+      } else {
+        if (showCoordinates) {
+          setHoveredX({ mathX: mathPt.mx, canvasX: touchX, canvasY: touchY });
+        }
+      }
+    } else if (e.touches.length === 2 && touchPinchDistRef.current !== null) {
+      // Pinch to Zoom
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const prevDist = touchPinchDistRef.current;
+      if (prevDist > 0) {
+        const factor = prevDist / dist;
+        if (Math.abs(1 - factor) > 0.015) {
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+          const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+          const centerPt = canvasToMath(midX, midY, width, height);
+          handleZoom(factor > 1 ? 1.05 : 0.95, centerPt.mx, centerPt.my);
+          touchPinchDistRef.current = dist;
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setDraggingMode(null);
+    setPanStart(null);
+    setActiveSnapInfo(null);
+    touchPinchDistRef.current = null;
+  };
+
   return (
     <div
       ref={containerRef}
@@ -840,6 +1024,10 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           setHoveredX(null);
           setActiveSnapInfo(null);
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className={`w-full h-full touch-none select-none ${
           draggingMode === 'pan' ? 'cursor-grabbing' : 'cursor-crosshair'
         }`}
