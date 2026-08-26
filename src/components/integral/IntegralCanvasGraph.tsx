@@ -229,7 +229,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   );
 
   // Zoom Handler
-  const handleZoom = (zoomFactor: number, centerMathX?: number, centerMathY?: number) => {
+  const handleZoom = useCallback((zoomFactor: number, centerMathX?: number, centerMathY?: number) => {
     sounds.playPop();
     const currentCenterX = centerMathX !== undefined ? centerMathX : (xMin + xMax) / 2;
     const currentCenterY = centerMathY !== undefined ? centerMathY : (yMin + yMax) / 2;
@@ -249,20 +249,29 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setXMax(parseFloat((currentCenterX + (1 - ratioLeft) * newSpanX).toFixed(2)));
     setYMin(parseFloat((currentCenterY - ratioBottom * newSpanY).toFixed(2)));
     setYMax(parseFloat((currentCenterY + (1 - ratioBottom) * newSpanY).toFixed(2)));
-  };
+  }, [xMin, xMax, yMin, yMax]);
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
+  // Non-passive wheel event listener to prevent 'Unable to preventDefault inside passive event listener' in Chrome
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    const mathPt = canvasToMath(clickX, clickY, rect.width, rect.height);
 
-    const zoomFactor = e.deltaY < 0 ? 0.85 : 1.18;
-    handleZoom(zoomFactor, mathPt.mx, mathPt.my);
-  };
+    const onWheelZoom = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const mathPt = canvasToMath(clickX, clickY, rect.width, rect.height);
+
+      const zoomFactor = e.deltaY < 0 ? 0.85 : 1.18;
+      handleZoom(zoomFactor, mathPt.mx, mathPt.my);
+    };
+
+    canvas.addEventListener('wheel', onWheelZoom, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', onWheelZoom);
+    };
+  }, [canvasToMath, handleZoom]);
 
   const toggleFullscreen = () => {
     sounds.playPop();
@@ -623,7 +632,11 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         ? `🧲 ${label}=${val.toLocaleString('de-DE', { maximumFractionDigits: 3 })}`
         : `${label}=${val.toFixed(2)}`;
       const badgeWidth = matchedKeyPoint ? 85 : 55;
-      ctx.roundRect(ptX - badgeWidth / 2, 10, badgeWidth, 24, 8);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(ptX - badgeWidth / 2, 10, badgeWidth, 24, 8);
+      } else {
+        ctx.rect(ptX - badgeWidth / 2, 10, badgeWidth, 24);
+      }
       ctx.fill();
 
       ctx.fillStyle = '#090d16';
@@ -649,7 +662,11 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       const snapPt = mathToCanvas(activeSnapInfo.x, 0, width, height);
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
-      ctx.roundRect(snapPt.cx - 90, 42, 180, 26, 8);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(snapPt.cx - 90, 42, 180, 26, 8);
+      } else {
+        ctx.rect(snapPt.cx - 90, 42, 180, 26);
+      }
       ctx.fill();
       ctx.strokeStyle = activeSnapInfo.color;
       ctx.lineWidth = 2;
@@ -1014,7 +1031,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     >
       <canvas
         ref={canvasRef}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

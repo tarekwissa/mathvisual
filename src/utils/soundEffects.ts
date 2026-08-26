@@ -1,27 +1,50 @@
-// Web Audio API Synthesizer Sound Engine for ultra-crisp, lag-free sound effects without external audio files
-
 class SoundManager {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private userInteracted: boolean = false;
 
   constructor() {
     // Read mute preference from localStorage
-    const saved = localStorage.getItem('mathevisual_sound_muted');
-    this.isMuted = saved === 'true';
+    try {
+      const saved = localStorage.getItem('mathevisual_sound_muted');
+      this.isMuted = saved === 'true';
+    } catch {
+      this.isMuted = false;
+    }
+
+    // Safely enable audio on first real user gesture to adhere to Chrome autoplay policy
+    const handleGesture = () => {
+      this.userInteracted = true;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pointerdown', handleGesture);
+        window.removeEventListener('keydown', handleGesture);
+        window.removeEventListener('touchstart', handleGesture);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointerdown', handleGesture, { once: true, passive: true });
+      window.addEventListener('keydown', handleGesture, { once: true, passive: true });
+      window.addEventListener('touchstart', handleGesture, { once: true, passive: true });
+    }
   }
 
   private getAudioContext(): AudioContext | null {
-    if (this.isMuted) return null;
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+    if (this.isMuted || !this.userInteracted) return null;
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
       }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      return this.ctx;
+    } catch {
+      return null;
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-    return this.ctx;
   }
 
   public toggleMute(): boolean {

@@ -14,14 +14,15 @@ export const MathRenderer: React.FC<MathRendererProps> = ({
 }) => {
   const html = useMemo(() => {
     try {
+      if (!latex || typeof latex !== 'string') return '';
       return katex.renderToString(latex, {
         displayMode: display,
         throwOnError: false,
-        output: 'htmlAndMathml'
+        output: 'htmlAndMathml',
+        strict: false
       });
-    } catch (error) {
-      console.error('KaTeX rendering error:', error);
-      return `<span class="text-rose-400 font-mono text-xs">${latex}</span>`;
+    } catch {
+      return `<span class="text-slate-300 font-mono text-xs">${latex || ''}</span>`;
     }
   }, [latex, display]);
 
