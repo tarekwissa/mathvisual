@@ -10,7 +10,7 @@ import {
   Move,
   Play,
   Gauge,
-  Grid,
+  Scale,
   ChevronDown,
   Magnet,
   Crosshair
@@ -26,6 +26,8 @@ export interface CompiledFunctionItem {
   fn: (x: number) => number;
   isValid: boolean;
 }
+
+export type AxisRatio = '1:1' | '1:2' | '1:3' | '1:5' | '2:1' | '3:1' | 'free';
 
 interface IntegralCanvasGraphProps {
   functionsList: CompiledFunctionItem[];
@@ -47,6 +49,25 @@ interface IntegralCanvasGraphProps {
   areaBetween?: number;
   riemannSum?: number;
   rootsInInterval?: number[];
+}
+
+/**
+ * GeoGebra-style dynamic step calculation for clean grid ticks
+ */
+function getDynamicStep(span: number): number {
+  const rawStep = Math.max(0.001, span / 8);
+  const power = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const fraction = rawStep / power;
+  if (fraction < 1.5) return 1 * power;
+  if (fraction < 3.5) return 2 * power;
+  if (fraction < 7.5) return 5 * power;
+  return 10 * power;
+}
+
+function formatTickNumber(val: number, step: number): string {
+  if (Math.abs(val) < 1e-6) return '0';
+  const decimals = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  return val.toFixed(decimals);
 }
 
 export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
@@ -76,14 +97,14 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Math viewport coordinates - initialized to balanced 1:1 ratio
+  // Math viewport coordinates
   const [xMin, setXMin] = useState<number>(-5);
   const [xMax, setXMax] = useState<number>(5);
   const [yMin, setYMin] = useState<number>(-2.8);
   const [yMax, setYMax] = useState<number>(2.8);
 
-  // Grid step spacing configuration (Achsen-Schrittweiten)
-  const [gridSpacing, setGridSpacing] = useState<'equal_1' | 'equal_05' | 'equal_2' | 'equal_02' | 'auto'>('equal_1');
+  // GeoGebra-Style Axis Ratio State
+  const [axisRatio, setAxisRatio] = useState<AxisRatio>('1:1');
 
   // Magnetic Snapping to Roots & Intersections Toggle
   const [isMagneticSnap, setIsMagneticSnap] = useState<boolean>(true);
@@ -91,6 +112,9 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
   // Show/Hide Mouse Coordinates Toggle
   const [showCoordinates, setShowCoordinates] = useState<boolean>(true);
+
+  // Hover zone: 'x' (hovering near x-axis), 'y' (hovering near y-axis), or null
+  const [hoveredAxisZone, setHoveredAxisZone] = useState<'x' | 'y' | null>(null);
 
   // Drawing Animation
   const [drawProgress, setDrawProgress] = useState<number>(1); // 0 to 1
@@ -147,68 +171,6 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     startDrawingAnimation();
   }, [functionsList, startDrawingAnimation]);
 
-  // Initial & Reset View: 1:1 Orthonormal Aspect Ratio (1 unit on X = 1 unit on Y)
-  const handleResetView = useCallback(() => {
-    sounds.playPop();
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const aspect = (rect.width > 0 && rect.height > 0) ? rect.width / rect.height : (16 / 9);
-      const spanX = 10;
-      const spanY = spanX / aspect;
-      setXMin(-5);
-      setXMax(5);
-      setYMin(parseFloat((-spanY / 2).toFixed(2)));
-      setYMax(parseFloat((spanY / 2).toFixed(2)));
-    } else {
-      setXMin(-5);
-      setXMax(5);
-      setYMin(-2.8);
-      setYMax(2.8);
-    }
-  }, []);
-
-  // Sync aspect ratio automatically on page load, mount, refresh, and resize
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const syncAspectRatio = () => {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const aspect = rect.width / rect.height;
-        const currentSpanX = 10;
-        const newSpanY = currentSpanX / aspect;
-        setXMin(-5);
-        setXMax(5);
-        setYMin(parseFloat((-newSpanY / 2).toFixed(2)));
-        setYMax(parseFloat((newSpanY / 2).toFixed(2)));
-      }
-    };
-
-    // Run on initial mount / page load
-    const timer = setTimeout(syncAspectRatio, 50);
-
-    const observer = new ResizeObserver(() => {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        const aspect = rect.width / rect.height;
-        const currentSpanX = xMax - xMin;
-        const currentCenterY = (yMin + yMax) / 2;
-        const newSpanY = currentSpanX / aspect;
-        setYMin(parseFloat((currentCenterY - newSpanY / 2).toFixed(2)));
-        setYMax(parseFloat((currentCenterY + newSpanY / 2).toFixed(2)));
-      }
-    });
-
-    observer.observe(canvas);
-
-    return () => {
-      clearTimeout(timer);
-      observer.disconnect();
-    };
-  }, [isFullscreen]);
-
   // Coordinate transforms
   const mathToCanvas = useCallback(
     (mx: number, my: number, width: number, height: number) => {
@@ -228,30 +190,145 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     [xMin, xMax, yMin, yMax]
   );
 
-  // Zoom Handler
-  const handleZoom = useCallback((zoomFactor: number, centerMathX?: number, centerMathY?: number) => {
+  // Ratio multiplier: ratio of Y units to X units in the same physical pixel length
+  const getRatioMultiplier = (ratio: AxisRatio): number => {
+    switch (ratio) {
+      case '1:1': return 1;
+      case '1:2': return 2;
+      case '1:3': return 3;
+      case '1:5': return 5;
+      case '2:1': return 0.5;
+      case '3:1': return 1 / 3;
+      default: return 1;
+    }
+  };
+
+  // Apply predefined Axis Ratio (1:1, 1:2, 1:3, 2:1, etc.)
+  const applyAxisRatio = useCallback((ratio: AxisRatio) => {
     sounds.playPop();
-    const currentCenterX = centerMathX !== undefined ? centerMathX : (xMin + xMax) / 2;
-    const currentCenterY = centerMathY !== undefined ? centerMathY : (yMin + yMax) / 2;
+    setAxisRatio(ratio);
+    if (ratio === 'free') return;
 
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : (16 / 9);
+
+    const multiplier = getRatioMultiplier(ratio);
     const currentSpanX = xMax - xMin;
-    const currentSpanY = yMax - yMin;
+    const newSpanY = (currentSpanX * multiplier) / aspect;
+    const centerY = (yMin + yMax) / 2;
 
-    const newSpanX = currentSpanX * zoomFactor;
-    const newSpanY = currentSpanY * zoomFactor;
-
-    if (newSpanX < 0.5 || newSpanX > 60) return;
-
-    const ratioLeft = (currentCenterX - xMin) / currentSpanX;
-    const ratioBottom = (currentCenterY - yMin) / currentSpanY;
-
-    setXMin(parseFloat((currentCenterX - ratioLeft * newSpanX).toFixed(2)));
-    setXMax(parseFloat((currentCenterX + (1 - ratioLeft) * newSpanX).toFixed(2)));
-    setYMin(parseFloat((currentCenterY - ratioBottom * newSpanY).toFixed(2)));
-    setYMax(parseFloat((currentCenterY + (1 - ratioBottom) * newSpanY).toFixed(2)));
+    setYMin(parseFloat((centerY - newSpanY / 2).toFixed(2)));
+    setYMax(parseFloat((centerY + newSpanY / 2).toFixed(2)));
   }, [xMin, xMax, yMin, yMax]);
 
-  // Non-passive wheel event listener to prevent 'Unable to preventDefault inside passive event listener' in Chrome
+  // Initial & Reset View: 1:1 Orthonormal Aspect Ratio
+  const handleResetView = useCallback(() => {
+    sounds.playPop();
+    setAxisRatio('1:1');
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const aspect = (rect.width > 0 && rect.height > 0) ? rect.width / rect.height : (16 / 9);
+      const spanX = 10;
+      const spanY = spanX / aspect;
+      setXMin(-5);
+      setXMax(5);
+      setYMin(parseFloat((-spanY / 2).toFixed(2)));
+      setYMax(parseFloat((spanY / 2).toFixed(2)));
+    } else {
+      setXMin(-5);
+      setXMax(5);
+      setYMin(-2.8);
+      setYMax(2.8);
+    }
+  }, []);
+
+  // Sync aspect ratio only on initial mount, window resize, or fullscreen change (NOT resetting on ratio change)
+  const isMountedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const aspect = rect.width / rect.height;
+        const currentSpanX = 10;
+        const newSpanY = currentSpanX / aspect;
+        setXMin(-5);
+        setXMax(5);
+        setYMin(parseFloat((-newSpanY / 2).toFixed(2)));
+        setYMax(parseFloat((newSpanY / 2).toFixed(2)));
+      }
+    }
+
+    const observer = new ResizeObserver(() => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const aspect = rect.width / rect.height;
+        const currentSpanX = xMax - xMin;
+        const currentCenterY = (yMin + yMax) / 2;
+        if (axisRatio !== 'free') {
+          const multiplier = getRatioMultiplier(axisRatio);
+          const newSpanY = (currentSpanX * multiplier) / aspect;
+          setYMin(parseFloat((currentCenterY - newSpanY / 2).toFixed(2)));
+          setYMax(parseFloat((currentCenterY + newSpanY / 2).toFixed(2)));
+        }
+      }
+    });
+
+    observer.observe(canvas);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isFullscreen]);
+
+  // GeoGebra-style Granular Zoom: Both, X-only, or Y-only
+  const handleZoomAxis = useCallback(
+    (
+      axis: 'both' | 'x' | 'y',
+      zoomFactor: number,
+      centerMathX?: number,
+      centerMathY?: number
+    ) => {
+      sounds.playPop();
+      const currentCenterX = centerMathX !== undefined ? centerMathX : (xMin + xMax) / 2;
+      const currentCenterY = centerMathY !== undefined ? centerMathY : (yMin + yMax) / 2;
+
+      const currentSpanX = xMax - xMin;
+      const currentSpanY = yMax - yMin;
+
+      if (axis === 'both' || axis === 'x') {
+        const newSpanX = currentSpanX * zoomFactor;
+        if (newSpanX >= 0.2 && newSpanX <= 150) {
+          const ratioLeft = (currentCenterX - xMin) / currentSpanX;
+          setXMin(parseFloat((currentCenterX - ratioLeft * newSpanX).toFixed(2)));
+          setXMax(parseFloat((currentCenterX + (1 - ratioLeft) * newSpanX).toFixed(2)));
+        }
+      }
+
+      if (axis === 'both' || axis === 'y') {
+        const newSpanY = currentSpanY * zoomFactor;
+        if (newSpanY >= 0.2 && newSpanY <= 150) {
+          const ratioBottom = (currentCenterY - yMin) / currentSpanY;
+          setYMin(parseFloat((currentCenterY - ratioBottom * newSpanY).toFixed(2)));
+          setYMax(parseFloat((currentCenterY + (1 - ratioBottom) * newSpanY).toFixed(2)));
+        }
+      }
+
+      if (axis !== 'both') {
+        setAxisRatio('free');
+      }
+    },
+    [xMin, xMax, yMin, yMax]
+  );
+
+  // Non-passive wheel event listener: Detects hover over X-Axis vs. Y-Axis for independent zooming
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -259,19 +336,35 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     const onWheelZoom = (e: WheelEvent) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
-      const mathPt = canvasToMath(clickX, clickY, rect.width, rect.height);
+      const mathPt = canvasToMath(clickX, clickY, width, height);
+
+      const origin = mathToCanvas(0, 0, width, height);
+      const distToXAxis = Math.abs(clickY - origin.cy);
+      const distToYAxis = Math.abs(clickX - origin.cx);
 
       const zoomFactor = e.deltaY < 0 ? 0.85 : 1.18;
-      handleZoom(zoomFactor, mathPt.mx, mathPt.my);
+
+      if (e.shiftKey || (distToXAxis < 35 && distToYAxis >= 35)) {
+        // Zoom ONLY X-Axis
+        handleZoomAxis('x', zoomFactor, mathPt.mx, mathPt.my);
+      } else if (e.ctrlKey || (distToYAxis < 35 && distToXAxis >= 35)) {
+        // Zoom ONLY Y-Axis
+        handleZoomAxis('y', zoomFactor, mathPt.mx, mathPt.my);
+      } else {
+        // Zoom Both
+        handleZoomAxis('both', zoomFactor, mathPt.mx, mathPt.my);
+      }
     };
 
     canvas.addEventListener('wheel', onWheelZoom, { passive: false });
     return () => {
       canvas.removeEventListener('wheel', onWheelZoom);
     };
-  }, [canvasToMath, handleZoom]);
+  }, [canvasToMath, mathToCanvas, handleZoomAxis]);
 
   const toggleFullscreen = () => {
     sounds.playPop();
@@ -326,37 +419,12 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // 1. Grid Step Calculation based on gridSpacing selection
+    // 1. Dynamic GeoGebra-style Grid Step Calculation
     const spanX = xMax - xMin;
     const spanY = yMax - yMin;
 
-    let xStep = 1;
-    let yStep = 1;
-
-    if (gridSpacing === 'equal_1') {
-      xStep = 1;
-      yStep = 1;
-    } else if (gridSpacing === 'equal_05') {
-      xStep = 0.5;
-      yStep = 0.5;
-    } else if (gridSpacing === 'equal_2') {
-      xStep = 2;
-      yStep = 2;
-    } else if (gridSpacing === 'equal_02') {
-      xStep = 0.2;
-      yStep = 0.2;
-    } else {
-      // Auto dynamic scaling
-      if (spanX > 25) xStep = 5;
-      else if (spanX > 12) xStep = 2;
-      else if (spanX < 3) xStep = 0.2;
-      else if (spanX < 6) xStep = 0.5;
-
-      if (spanY > 25) yStep = 5;
-      else if (spanY > 12) yStep = 2;
-      else if (spanY < 3) yStep = 0.2;
-      else if (spanY < 6) yStep = 0.5;
-    }
+    const xStep = getDynamicStep(spanX);
+    const yStep = getDynamicStep(spanY);
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
@@ -369,12 +437,12 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.lineTo(cx, height);
       ctx.stroke();
 
-      if (Math.abs(x) > 0.01) {
+      if (Math.abs(x) > 0.0001) {
         ctx.fillStyle = '#64748b';
         ctx.font = '10px Fira Code, monospace';
         const { cy: originY } = mathToCanvas(0, 0, width, height);
         const textY = Math.min(Math.max(originY + 14, 15), height - 8);
-        ctx.fillText(x.toFixed(xStep < 1 ? 1 : 0), cx - 6, textY);
+        ctx.fillText(formatTickNumber(x, xStep), cx - 6, textY);
       }
     }
 
@@ -386,25 +454,29 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       ctx.lineTo(width, cy);
       ctx.stroke();
 
-      if (Math.abs(y) > 0.01) {
+      if (Math.abs(y) > 0.0001) {
         ctx.fillStyle = '#64748b';
         ctx.font = '10px Fira Code, monospace';
         const { cx: originX } = mathToCanvas(0, 0, width, height);
-        const textX = Math.min(Math.max(originX + 6, 6), width - 28);
-        ctx.fillText(y.toFixed(yStep < 1 ? 1 : 0), textX, cy + 4);
+        const textX = Math.min(Math.max(originX + 6, 6), width - 35);
+        ctx.fillText(formatTickNumber(y, yStep), textX, cy + 4);
       }
     }
 
-    // 2. Main Axes
+    // 2. Main Axes (Highlighting on Hover)
     const origin = mathToCanvas(0, 0, width, height);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#94a3b8';
-
+    
+    // X Axis
+    ctx.lineWidth = hoveredAxisZone === 'x' ? 3.5 : 2;
+    ctx.strokeStyle = hoveredAxisZone === 'x' ? '#38bdf8' : '#94a3b8';
     ctx.beginPath();
     ctx.moveTo(0, origin.cy);
     ctx.lineTo(width, origin.cy);
     ctx.stroke();
 
+    // Y Axis
+    ctx.lineWidth = hoveredAxisZone === 'y' ? 3.5 : 2;
+    ctx.strokeStyle = hoveredAxisZone === 'y' ? '#38bdf8' : '#94a3b8';
     ctx.beginPath();
     ctx.moveTo(origin.cx, 0);
     ctx.lineTo(origin.cx, height);
@@ -738,10 +810,10 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     xMax,
     yMin,
     yMax,
-    gridSpacing,
     keyPoints,
     activeSnapInfo,
     showCoordinates,
+    hoveredAxisZone,
     mathToCanvas,
     areaType,
     riemannType,
@@ -803,6 +875,17 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     const height = rect.height;
 
     const mathPt = canvasToMath(mouseX, mouseY, width, height);
+    const origin = mathToCanvas(0, 0, width, height);
+    const distToXAxis = Math.abs(mouseY - origin.cy);
+    const distToYAxis = Math.abs(mouseX - origin.cx);
+
+    if (distToXAxis < 32 && distToYAxis >= 32) {
+      setHoveredAxisZone('x');
+    } else if (distToYAxis < 32 && distToXAxis >= 32) {
+      setHoveredAxisZone('y');
+    } else {
+      setHoveredAxisZone(null);
+    }
 
     if (draggingMode === 'a' || draggingMode === 'b') {
       let targetX = mathPt.mx;
@@ -869,7 +952,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
   };
 
   // Touch handlers for Tablets, iPads and Touchscreens
-  const touchPinchDistRef = useRef<number | null>(null);
+  const touchPinchDistRef = useRef<{ dist: number; diffX: number; diffY: number } | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -915,11 +998,10 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
       // 2 Fingers: Pinch to Zoom
       setDraggingMode(null);
       setPanStart(null);
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      touchPinchDistRef.current = dist;
+      const diffX = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      const diffY = Math.abs(e.touches[0].clientY - e.touches[1].clientY);
+      const dist = Math.hypot(diffX, diffY);
+      touchPinchDistRef.current = { dist, diffX, diffY };
     }
   };
 
@@ -994,20 +1076,33 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         }
       }
     } else if (e.touches.length === 2 && touchPinchDistRef.current !== null) {
-      // Pinch to Zoom
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const prevDist = touchPinchDistRef.current;
-      if (prevDist > 0) {
-        const factor = prevDist / dist;
+      // Pinch to Zoom with Axis Direction Detection (X vs Y vs Both)
+      const diffX = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      const diffY = Math.abs(e.touches[0].clientY - e.touches[1].clientY);
+      const dist = Math.hypot(diffX, diffY);
+      const prev = touchPinchDistRef.current;
+
+      if (prev.dist > 0) {
+        const factor = prev.dist / dist;
         if (Math.abs(1 - factor) > 0.015) {
           const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
           const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
           const centerPt = canvasToMath(midX, midY, width, height);
-          handleZoom(factor > 1 ? 1.05 : 0.95, centerPt.mx, centerPt.my);
-          touchPinchDistRef.current = dist;
+
+          const zoomFactor = factor > 1 ? 1.05 : 0.95;
+
+          if (diffX > 2.0 * diffY) {
+            // Horizontal pinch -> Zoom X only!
+            handleZoomAxis('x', zoomFactor, centerPt.mx, centerPt.my);
+          } else if (diffY > 2.0 * diffX) {
+            // Vertical pinch -> Zoom Y only!
+            handleZoomAxis('y', zoomFactor, centerPt.mx, centerPt.my);
+          } else {
+            // Diagonal pinch -> Zoom both!
+            handleZoomAxis('both', zoomFactor, centerPt.mx, centerPt.my);
+          }
+
+          touchPinchDistRef.current = { dist, diffX, diffY };
         }
       }
     }
@@ -1017,6 +1112,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
     setDraggingMode(null);
     setPanStart(null);
     setActiveSnapInfo(null);
+    setHoveredAxisZone(null);
     touchPinchDistRef.current = null;
   };
 
@@ -1039,13 +1135,20 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
           setPanStart(null);
           setHoveredX(null);
           setActiveSnapInfo(null);
+          setHoveredAxisZone(null);
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         className={`w-full h-full touch-none select-none ${
-          draggingMode === 'pan' ? 'cursor-grabbing' : 'cursor-crosshair'
+          draggingMode === 'pan'
+            ? 'cursor-grabbing'
+            : hoveredAxisZone === 'x'
+            ? 'cursor-ew-resize'
+            : hoveredAxisZone === 'y'
+            ? 'cursor-ns-resize'
+            : 'cursor-crosshair'
         }`}
       />
 
@@ -1110,24 +1213,24 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
         <div className="w-[1px] h-5 bg-slate-700 mx-1 hidden sm:block" />
 
-        {/* Grid Spacing Selector Dropdown */}
+        {/* Achsenverhältnis Selector Dropdown (GeoGebra Style) */}
         <div className="relative flex items-center">
           <div className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-700/90 rounded-xl px-2.5 py-1.5 border border-slate-700 text-xs font-mono text-cyan-300 cursor-pointer">
-            <Grid className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <Scale className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-slate-400 text-[11px] mr-1 hidden sm:inline">Achsen:</span>
             <select
-              value={gridSpacing}
-              onChange={(e) => {
-                sounds.playPop();
-                setGridSpacing(e.target.value as any);
-              }}
+              value={axisRatio}
+              onChange={(e) => applyAxisRatio(e.target.value as any)}
               className="appearance-none bg-transparent text-slate-200 text-xs font-mono font-semibold focus:outline-none cursor-pointer pr-4"
-              title="Achsen-Schrittweiten / Rasterabstand einstellen"
+              title="Achsenverhältnis (Maßstab X zu Y) wie in GeoGebra einstellen"
             >
-              <option value="equal_1" className="bg-slate-900 text-white">Ganze Schritte (1.0)</option>
-              <option value="equal_05" className="bg-slate-900 text-white">Halbschritte (0.5)</option>
-              <option value="equal_2" className="bg-slate-900 text-white">Zweierschritte (2.0)</option>
-              <option value="equal_02" className="bg-slate-900 text-white">Feinraster (0.2)</option>
-              <option value="auto" className="bg-slate-900 text-white">Auto (Dynamisch)</option>
+              <option value="1:1" className="bg-slate-900 text-white">1 : 1 (Standard)</option>
+              <option value="1:2" className="bg-slate-900 text-white">1 : 2 (1x = 2y)</option>
+              <option value="1:3" className="bg-slate-900 text-white">1 : 3 (1x = 3y)</option>
+              <option value="1:5" className="bg-slate-900 text-white">1 : 5 (1x = 5y)</option>
+              <option value="2:1" className="bg-slate-900 text-white">2 : 1 (2x = 1y)</option>
+              <option value="3:1" className="bg-slate-900 text-white">3 : 1 (3x = 1y)</option>
+              <option value="free" className="bg-slate-900 text-white">Frei / Separat</option>
             </select>
             <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
@@ -1137,14 +1240,14 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
 
         {/* Zoom In/Out & Reset */}
         <button
-          onClick={() => handleZoom(0.8)}
+          onClick={() => handleZoomAxis('both', 0.8)}
           className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all"
           title="Vergrößern (Zoom In)"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
-          onClick={() => handleZoom(1.25)}
+          onClick={() => handleZoomAxis('both', 1.25)}
           className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all"
           title="Verkleinern (Zoom Out)"
         >
@@ -1153,7 +1256,7 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         <button
           onClick={handleResetView}
           className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all"
-          title="Ansicht zurücksetzen (Auto-Fit)"
+          title="Ansicht zurücksetzen (1:1 Auto-Fit)"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
@@ -1174,8 +1277,32 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         </button>
       </div>
 
+      {/* Floating Axis Zoom Tooltip Indicator */}
+      {hoveredAxisZone && (
+        <div
+          className="absolute pointer-events-none bg-indigo-950/95 text-indigo-200 border border-indigo-500/50 px-2.5 py-1 rounded-lg text-[11px] font-mono shadow-xl backdrop-blur z-30 flex items-center gap-1.5 animate-pulse"
+          style={{
+            left: hoveredX ? Math.min(hoveredX.canvasX + 12, window.innerWidth - 180) : 20,
+            top: hoveredX ? Math.max(10, hoveredX.canvasY - 30) : 20
+          }}
+        >
+          {hoveredAxisZone === 'x' && (
+            <>
+              <span>↔</span>
+              <span className="font-bold text-cyan-300">x-Achse zoomen (Mausrad)</span>
+            </>
+          )}
+          {hoveredAxisZone === 'y' && (
+            <>
+              <span>↕</span>
+              <span className="font-bold text-cyan-300">y-Achse zoomen (Mausrad)</span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Floating Multi-Function Tooltip (only when showCoordinates is true) */}
-      {hoveredX && showCoordinates && (
+      {hoveredX && showCoordinates && !hoveredAxisZone && (
         <div
           className="absolute pointer-events-none bg-slate-900/95 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-mono shadow-2xl backdrop-blur z-10 space-y-1"
           style={{
@@ -1206,6 +1333,8 @@ export const IntegralCanvasGraph: React.FC<IntegralCanvasGraphProps> = ({
         <div className="text-[11px] text-slate-400 font-mono hidden sm:flex items-center gap-2 bg-slate-950/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800/90 shadow-lg">
           <Move className="w-3.5 h-3.5 text-indigo-400" />
           <span>Ziehen: Verschieben</span>
+          <span>•</span>
+          <span className="text-cyan-300">Achsen scrollen: X/Y separat</span>
           <span>•</span>
           <span className="text-amber-300">🧲 Magnet-Snap</span>
         </div>

@@ -155,16 +155,21 @@ export const Percent100GridTutor: React.FC = () => {
     return 0;
   }, [selectedType, currentSlide, activeP, freeP]);
 
+  const format2Decimals = (val: number): string => {
+    return val.toLocaleString('de-DE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   // Value displayed in each cell of the grid
   const displayCellNumber = (_cellIndex?: number) => {
     if (selectedType === 'free') {
       const one = freeG / 100;
-      return one < 100 ? one.toLocaleString('de-DE', { maximumFractionDigits: 2 }) : one.toFixed(0);
+      return format2Decimals(one);
     }
     if (currentSlide >= 2) {
-      return cellValue1Percent < 100
-        ? cellValue1Percent.toLocaleString('de-DE', { maximumFractionDigits: 2 })
-        : cellValue1Percent.toFixed(0);
+      return format2Decimals(cellValue1Percent);
     }
     return '?';
   };
@@ -408,7 +413,11 @@ export const Percent100GridTutor: React.FC = () => {
               onClick={handleNextSlide}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-base shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <span>Weiter zur Hundertertafel</span>
+              <span>
+                {selectedType === 'typeB'
+                  ? `Weiter zu den ${Math.round(activeP)} Kästchen (${Math.round(activeP)} %)`
+                  : 'Weiter zur Hundertertafel'}
+              </span>
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -416,50 +425,105 @@ export const Percent100GridTutor: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* SLIDE 2: HUNDERTERTAFEL MIT WERTEN (1 % PRO KÄSTCHEN)                     */}
+      {/* SLIDE 2: 1 % FINDEN (BEI TYP B NUR P KÄSTCHEN, SONST 100ER-TAFEL)         */}
       {/* ========================================================================= */}
       {currentSlide === 2 && selectedType !== 'free' && (
         <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-fadeIn">
           <div className="text-center space-y-1">
             <span className="text-xs font-mono uppercase text-amber-400 font-bold tracking-wider">
-              Folie 2 von 3: Hundertertafel
+              {selectedType === 'typeB'
+                ? `Folie 2 von 3: 1 % finden (${Math.round(activeP)} Kästchen)`
+                : 'Folie 2 von 3: Hundertertafel'}
             </span>
             <div className="text-xl sm:text-2xl font-extrabold text-white">
               {selectedType === 'typeB'
-                ? `${activeW} ${unit} ÷ ${activeP} Kästchen = ${cellValue1Percent.toFixed(2)} ${unit} pro Kästchen`
-                : `${activeG} ${unit} verteilt auf 100 Kästchen = ${cellValue1Percent.toFixed(2)} ${unit} pro Kästchen`}
+                ? `${activeW.toFixed(2)} ${unit} verteilt auf ${Math.round(activeP)} Kästchen = ${cellValue1Percent.toFixed(2)} ${unit} pro Kästchen`
+                : `${activeG.toFixed(2)} ${unit} verteilt auf 100 Kästchen = ${cellValue1Percent.toFixed(2)} ${unit} pro Kästchen`}
             </div>
             <p className="text-xs text-slate-400 font-mono">
-              In jedem einzelnen der 100 Kästchen steht genau <strong>{cellValue1Percent.toFixed(2)} {unit}</strong> (exakt 1 %)
+              {selectedType === 'typeB' ? (
+                <>
+                  Wir haben erst <strong>{Math.round(activeP)} %</strong> (also genau <strong>{Math.round(activeP)} Kästchen</strong>). Darauf teilen sich die {activeW.toFixed(2)} {unit} auf! Jedes Kästchen ist <strong>{cellValue1Percent.toFixed(2)} {unit} (1 %)</strong> wert.
+                </>
+              ) : (
+                <>
+                  In jedem einzelnen der 100 Kästchen steht genau <strong>{cellValue1Percent.toFixed(2)} {unit}</strong> (exakt 1 %)
+                </>
+              )}
             </p>
           </div>
 
-          {/* THE 100 GRID (10x10 Matrix) */}
-          <div className="grid grid-cols-10 gap-1.5 sm:gap-2 p-3 sm:p-4 bg-slate-950 rounded-2xl border border-slate-800 select-none aspect-square max-w-[460px] mx-auto">
-            {Array.from({ length: 100 }, (_, i) => {
-              const cellIndex = i + 1;
-              const isHovered = hoveredCell === cellIndex;
-              const isZoomed = zoomedCell === cellIndex;
+          {/* THE GRID: EXACTLY P CELLS FOR TYP B, FULL 100 GRID FOR TYP A / C */}
+          {selectedType === 'typeB' ? (
+            <div className="space-y-3">
+              <div className="text-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold">
+                  📦 Gegebener Teilbetrag: Genau {Math.round(activeP)} Kästchen für {activeW.toFixed(2)} {unit}
+                </span>
+              </div>
+              <div
+                className={`grid gap-1.5 sm:gap-2 p-4 bg-slate-950 rounded-2xl border-2 border-amber-500/50 select-none mx-auto ${
+                  Math.round(activeP) <= 5
+                    ? 'grid-cols-5 max-w-[280px]'
+                    : Math.round(activeP) <= 10
+                    ? 'grid-cols-5 max-w-[320px]'
+                    : Math.round(activeP) <= 20
+                    ? 'grid-cols-10 max-w-[460px]'
+                    : 'grid-cols-10 max-w-[460px]'
+                }`}
+              >
+                {Array.from({ length: Math.round(activeP) }, (_, i) => {
+                  const cellIndex = i + 1;
+                  const isHovered = hoveredCell === cellIndex;
+                  const isZoomed = zoomedCell === cellIndex;
 
-              return (
-                <button
-                  type="button"
-                  key={cellIndex}
-                  onMouseEnter={() => setHoveredCell(cellIndex)}
-                  onMouseLeave={() => setHoveredCell(null)}
-                  onClick={() => handleCellClick(cellIndex)}
-                  className={`relative flex flex-col items-center justify-center rounded-lg border text-[9px] sm:text-[10px] font-mono font-bold transition-all duration-200 cursor-pointer overflow-hidden bg-slate-900 text-slate-200 border-slate-700 hover:border-amber-400 hover:bg-slate-800 ${
-                    isHovered ? 'ring-2 ring-white scale-110 z-20' : ''
-                  } ${isZoomed ? 'ring-4 ring-cyan-400 scale-125 z-30 shadow-2xl' : ''}`}
-                >
-                  <span className="text-[7px] sm:text-[8px] opacity-60 leading-none">#{cellIndex}</span>
-                  <span className="font-extrabold text-[8px] sm:text-[9px] truncate max-w-full px-0.5 mt-0.5 text-amber-300">
-                    {displayCellNumber(cellIndex)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  return (
+                    <button
+                      type="button"
+                      key={cellIndex}
+                      onMouseEnter={() => setHoveredCell(cellIndex)}
+                      onMouseLeave={() => setHoveredCell(null)}
+                      onClick={() => handleCellClick(cellIndex)}
+                      className={`relative flex flex-col items-center justify-center rounded-lg border text-[9px] sm:text-[10px] font-mono font-bold transition-all duration-200 cursor-pointer overflow-hidden bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20 p-1 aspect-square ${
+                        isHovered ? 'ring-2 ring-white scale-110 z-20' : ''
+                      } ${isZoomed ? 'ring-4 ring-cyan-400 scale-125 z-30 shadow-2xl' : ''}`}
+                    >
+                      <span className="text-[7px] sm:text-[8px] opacity-80 leading-none">#{cellIndex}</span>
+                      <span className="font-extrabold text-[8px] sm:text-[9px] truncate max-w-full px-0.5 mt-0.5">
+                        {format2Decimals(cellValue1Percent)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-10 gap-1.5 sm:gap-2 p-3 sm:p-4 bg-slate-950 rounded-2xl border border-slate-800 select-none aspect-square max-w-[460px] mx-auto">
+              {Array.from({ length: 100 }, (_, i) => {
+                const cellIndex = i + 1;
+                const isHovered = hoveredCell === cellIndex;
+                const isZoomed = zoomedCell === cellIndex;
+
+                return (
+                  <button
+                    type="button"
+                    key={cellIndex}
+                    onMouseEnter={() => setHoveredCell(cellIndex)}
+                    onMouseLeave={() => setHoveredCell(null)}
+                    onClick={() => handleCellClick(cellIndex)}
+                    className={`relative flex flex-col items-center justify-center rounded-lg border text-[9px] sm:text-[10px] font-mono font-bold transition-all duration-200 cursor-pointer overflow-hidden bg-slate-900 text-slate-200 border-slate-700 hover:border-amber-400 hover:bg-slate-800 ${
+                      isHovered ? 'ring-2 ring-white scale-110 z-20' : ''
+                    } ${isZoomed ? 'ring-4 ring-cyan-400 scale-125 z-30 shadow-2xl' : ''}`}
+                  >
+                    <span className="text-[7px] sm:text-[8px] opacity-60 leading-none">#{cellIndex}</span>
+                    <span className="font-extrabold text-[8px] sm:text-[9px] truncate max-w-full px-0.5 mt-0.5 text-amber-300">
+                      {displayCellNumber(cellIndex)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* GROSSANSICHT / ZOOM CARD (IF CLICKED) */}
           {zoomedCell !== null && (
@@ -474,7 +538,7 @@ export const Percent100GridTutor: React.FC = () => {
                 🔍 Kästchen #{zoomedCell} (1 %) im Fokus:
               </span>
               <div className="text-3xl font-extrabold text-white font-mono">
-                {cellValue1Percent.toFixed(2)} {unit}
+                {format2Decimals(cellValue1Percent)} {unit}
               </div>
             </div>
           )}
@@ -492,7 +556,11 @@ export const Percent100GridTutor: React.FC = () => {
               onClick={handleNextSlide}
               className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <span>Weiter zur Lösung</span>
+              <span>
+                {selectedType === 'typeB'
+                  ? 'Weiter zum Ganzen (100 Kästchen = Grundwert)'
+                  : 'Weiter zur Lösung'}
+              </span>
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -507,22 +575,30 @@ export const Percent100GridTutor: React.FC = () => {
           <div className="text-center space-y-1">
             <span className="text-xs font-mono uppercase text-emerald-400 font-bold tracking-wider flex items-center justify-center gap-1">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Folie 3 von 3: Das Gesamtergebnis
+              {selectedType === 'typeB'
+                ? 'Folie 3 von 3: Vom Teil zum Ganzen (100 % = Grundwert)'
+                : 'Folie 3 von 3: Das Gesamtergebnis'}
             </span>
 
             {/* Big Solution Header */}
             <div className="text-2xl sm:text-3xl font-extrabold text-white pt-1">
               {selectedType === 'typeA' && `${activeP} Kästchen × ${cellValue1Percent.toFixed(2)} ${unit} = ${activeW.toFixed(2)} ${unit}`}
-              {selectedType === 'typeB' && `100 Kästchen × ${cellValue1Percent.toFixed(2)} ${unit} = ${activeG.toFixed(2)} ${unit}`}
-              {selectedType === 'typeC' && `${activeW} ${unit} ÷ ${cellValue1Percent.toFixed(2)} ${unit} = ${activeP.toFixed(1)} % (${activeP.toFixed(0)} Kästchen)`}
+              {selectedType === 'typeB' && `100 Kästchen × ${cellValue1Percent.toFixed(2)} ${unit} = ${activeG.toFixed(2)} ${unit} (Grundwert G)`}
+              {selectedType === 'typeC' && `${activeW.toFixed(2)} ${unit} ÷ ${cellValue1Percent.toFixed(2)} ${unit} = ${activeP.toFixed(2)} % (${activeP.toFixed(0)} Kästchen)`}
             </div>
+            {selectedType === 'typeB' && (
+              <p className="text-xs text-slate-400 font-mono">
+                Jetzt füllen wir die gesamte 100er-Tafel: Wenn 1 Kästchen (1 %) = {format2Decimals(cellValue1Percent)} {unit} ist, dann sind alle 100 Kästchen (100 %) genau <strong>{format2Decimals(activeG)} {unit}</strong>!
+              </p>
+            )}
           </div>
 
           {/* THE 100 GRID (10x10 Matrix) with highlighted cells */}
           <div className="grid grid-cols-10 gap-1.5 sm:gap-2 p-3 sm:p-4 bg-slate-950 rounded-2xl border border-slate-800 select-none aspect-square max-w-[460px] mx-auto">
             {Array.from({ length: 100 }, (_, i) => {
               const cellIndex = i + 1;
-              const isHighlighted = cellIndex <= highlightedCellsCount;
+              // Bei Typ B (Grundwert) leuchten alle 100 Kästchen in einheitlichem Gelb (100 %)
+              const isHighlighted = selectedType === 'typeB' ? true : cellIndex <= highlightedCellsCount;
               const isHovered = hoveredCell === cellIndex;
               const isZoomed = zoomedCell === cellIndex;
 
@@ -541,7 +617,7 @@ export const Percent100GridTutor: React.FC = () => {
                     isZoomed ? 'ring-4 ring-cyan-400 scale-125 z-30 shadow-2xl' : ''
                   }`}
                 >
-                  <span className="text-[7px] sm:text-[8px] opacity-60 leading-none">#{cellIndex}</span>
+                  <span className="text-[7px] sm:text-[8px] opacity-80 leading-none">#{cellIndex}</span>
                   <span className="font-extrabold text-[8px] sm:text-[9px] truncate max-w-full px-0.5 mt-0.5">
                     {displayCellNumber(cellIndex)}
                   </span>
@@ -557,11 +633,15 @@ export const Percent100GridTutor: React.FC = () => {
               <strong className="text-amber-300 text-base">{cellValue1Percent.toFixed(2)} {unit}</strong>
             </div>
             <div className="p-3 bg-slate-950 rounded-xl border border-emerald-500/40">
-              <span className="text-emerald-400 block text-[10px] uppercase">{activeP} Kästchen ({activeP} %)</span>
+              <span className="text-emerald-400 block text-[10px] uppercase">
+                {selectedType === 'typeB' ? `Gegeben: ${Math.round(activeP)} %` : `${activeP} Kästchen (${activeP} %)`}
+              </span>
               <strong className="text-emerald-400 text-base">{activeW.toFixed(2)} {unit}</strong>
             </div>
             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px] uppercase">100 Kästchen (100 %)</span>
+              <span className="text-slate-500 block text-[10px] uppercase">
+                {selectedType === 'typeB' ? 'Gesucht: Grundwert (100 %)' : '100 Kästchen (100 %)'}
+              </span>
               <strong className="text-white text-base">{activeG.toFixed(2)} {unit}</strong>
             </div>
           </div>
@@ -658,7 +738,7 @@ export const Percent100GridTutor: React.FC = () => {
                 >
                   <span className="text-[7px] opacity-60 leading-none">#{cellIndex}</span>
                   <span className="text-[8px] truncate max-w-full px-0.5">
-                    {(freeG / 100).toFixed(1)}
+                    {format2Decimals(freeG / 100)}
                   </span>
                 </button>
               );
