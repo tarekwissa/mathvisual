@@ -1,21 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Percent100GridTutor } from './Percent100GridTutor';
 import { PercentGlassVisualizer } from './PercentGlassVisualizer';
+import { PercentWaterPuzzle } from './PercentWaterPuzzle';
 import { PercentPizzaCutter } from './PercentPizzaCutter';
 import { PercentRealWorldScenarios } from './PercentRealWorldScenarios';
-import { Percent, ChevronDown, Bot, GlassWater, Pizza, Tag, Maximize2, Minimize2 } from 'lucide-react';
+import { Percent, ChevronDown, Bot, GlassWater, Pizza, Tag, Maximize2, Minimize2, Droplets } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 
 export const PercentExplorer: React.FC = () => {
-  const [activeView, setActiveView] = useState<'grid_tutor' | 'glass' | 'pizza' | 'scenarios'>('grid_tutor');
+  const [activeView, setActiveView] = useState<'grid_tutor' | 'glass' | 'water_puzzle' | 'pizza' | 'scenarios'>('water_puzzle');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const viewOptions = [
-    { id: 'grid_tutor', label: '1. Die Hundertertafel (Didaktischer 8.-Klasse-Tutor)', icon: Bot },
-    { id: 'glass', label: '2. Füllstands-Labor (Wie voll ist das Glas?)', icon: GlassWater },
-    { id: 'pizza', label: '3. Pizza- & Schoko-Teiler (Brüche zu %)', icon: Pizza },
-    { id: 'scenarios', label: '4. Reallife-Labor (Rabatt, MwSt, Trinkgeld)', icon: Tag }
+    { id: 'water_puzzle', label: '★ 1. Wasserspender-Rätsel (Klassen-Experiment 420 ml)', icon: Droplets },
+    { id: 'grid_tutor', label: '2. Die Hundertertafel (Didaktischer 8.-Klasse-Tutor)', icon: Bot },
+    { id: 'glass', label: '3. Füllstands-Labor (Wie voll ist das Glas?)', icon: GlassWater },
+    { id: 'pizza', label: '4. Pizza- & Schoko-Teiler (Brüche zu %)', icon: Pizza },
+    { id: 'scenarios', label: '5. Reallife-Labor (Rabatt, MwSt, Trinkgeld)', icon: Tag }
   ];
 
   const toggleFullscreen = () => {
@@ -116,6 +118,8 @@ export const PercentExplorer: React.FC = () => {
 
       {/* Active Concept Views */}
       <div className="transition-all duration-300">
+        {activeView === 'water_puzzle' && <PercentWaterPuzzle />}
+
         {activeView === 'grid_tutor' && <Percent100GridTutor />}
 
         {activeView === 'glass' && <PercentGlassVisualizer />}

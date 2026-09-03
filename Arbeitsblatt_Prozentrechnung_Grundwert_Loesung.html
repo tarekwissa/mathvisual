@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>LÖSUNG: Arbeitsblatt Prozentrechnung – Den Grundwert berechnen (Klasse 8b)</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 14mm 10mm 14mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: #000000;
+      background: #ffffff;
+      line-height: 1.35;
+      font-size: 11.5pt;
+    }
+    .page {
+      width: 100%;
+      min-height: 275mm;
+      max-height: 277mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      position: relative;
+    }
+    .page:last-child {
+      page-break-after: avoid;
+    }
+
+    /* Solution Styling (Color for Answers) */
+    .ans {
+      color: #0044cc;
+      font-weight: 700;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .ans-box {
+      color: #0044cc;
+      font-weight: 700;
+      background: #f0f5ff;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* Header Bar */
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+    }
+    .header-table td {
+      border: 1.5px solid #000000;
+      padding: 6px 12px;
+      font-size: 11pt;
+      font-weight: 600;
+    }
+    .header-table .badge-loesung {
+      background: #0044cc;
+      color: #ffffff;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    /* Title Block */
+    .title-block {
+      text-align: center;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+    .title-block h1 {
+      font-size: 17pt;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .title-block .sub {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #0044cc;
+      margin-top: 1px;
+    }
+
+    /* Rule Box (Merkkasten) */
+    .rule-box {
+      border: 2px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      background: #ffffff;
+    }
+    .rule-box-title {
+      font-size: 11.5pt;
+      font-weight: 800;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .rule-box ol {
+      margin-left: 20px;
+      font-size: 10.5pt;
+      line-height: 1.35;
+    }
+
+    /* Section Headings */
+    .section-head {
+      font-size: 12.5pt;
+      font-weight: 800;
+      border-bottom: 1.5px solid #000000;
+      padding-bottom: 2px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .task-desc {
+      font-size: 11pt;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    /* Task 1 Step Cards Grid */
+    .step-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .step-card {
+      border: 1.5px solid #000000;
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .step-card-head {
+      font-weight: 800;
+      font-size: 11.5pt;
+      border-bottom: 1px solid #000000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      background: #f4f4f4;
+      margin: -8px -10px 6px -10px;
+      padding: 6px 10px;
+      border-top-left-radius: 4px;
+      border-top-right-radius: 4px;
+    }
+    .step-row {
+      margin-bottom: 5px;
+      font-size: 10.5pt;
+    }
+    .step-label {
+      font-weight: 600;
+      font-size: 9.5pt;
+      color: #333333;
+      display: block;
+    }
+    .calc-line {
+      font-family: 'Segoe UI', monospace;
+      font-weight: 600;
+      font-size: 10.5pt;
+    }
+    .result-badge {
+      border-top: 1px dashed #000000;
+      padding-top: 4px;
+      margin-top: 4px;
+      font-weight: 800;
+      font-size: 11pt;
+    }
+
+    /* Mental Math Table (Task 2) */
+    .table-container {
+      margin-bottom: 8px;
+    }
+    .mental-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+    }
+    .mental-table td {
+      border: 1.5px solid #000000;
+      padding: 5px 8px;
+      vertical-align: middle;
+      width: 50%;
+    }
+    .mental-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mental-left {
+      font-weight: 600;
+    }
+    .mental-right {
+      font-weight: 700;
+      font-family: 'Segoe UI', monospace;
+      font-size: 11pt;
+    }
+
+    /* Word Problem Cards (Page 2) */
+    .word-problems-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 6px;
+    }
+    .problem-box {
+      border: 1.5px solid #000000;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #ffffff;
+    }
+    .problem-header {
+      font-weight: 800;
+      font-size: 11.5pt;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .problem-text {
+      font-size: 10.5pt;
+      margin-bottom: 5px;
+      line-height: 1.35;
+    }
+    .calc-area {
+      margin-top: 3px;
+      padding-top: 3px;
+      border-top: 1px dashed #666666;
+      font-size: 10.5pt;
+    }
+    .calc-row {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 2px;
+    }
+    .calc-tag {
+      font-weight: 800;
+      min-width: 90px;
+    }
+    .calc-content {
+      font-family: 'Segoe UI', monospace;
+      font-weight: 700;
+    }
+
+    /* Self Assessment */
+    .footer-eval {
+      border-top: 1.5px solid #000000;
+      padding-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5pt;
+      font-weight: 600;
+    }
+    .eval-emojis {
+      font-size: 15pt;
+      letter-spacing: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- PAGE 1: GRUNDREGEL, SCHRITT FÜR SCHRITT & KOPFRECHNEN                    -->
+  <!-- ========================================================================= -->
+  <div class="page">
+    <div>
+      <!-- Header Table -->
+      <table class="header-table">
+        <tr>
+          <td style="width: 38%;">👤 <strong>Name:</strong> <span class="ans">MUSTERLÖSUNG</span></td>
+          <td style="width: 24%;">🏫 <strong>Klasse:</strong> 8b</td>
+          <td style="width: 38%;" class="badge-loesung">✓ LÖSUNGSBLATT</td>
+        </tr>
+      </table>
+
+      <!-- Title Block -->
+      <div class="title-block">
+        <h1>Prozentrechnung: Das Ganze (100 %) finden</h1>
+        <div class="sub">Berechnung des Grundwerts – Musterlösung mit Rechenwegen</div>
+      </div>
+
+      <!-- Merkkasten / Regel -->
+      <div class="rule-box">
+        <div class="rule-box-title">💡 Die goldene 100er-Regel (Dreisatz):</div>
+        <ol>
+          <li><strong>1. Schritt (1 % finden):</strong> Teile den gegebenen Wert durch den Prozentsatz (<span class="ans">W : p</span>) → Wert für 1 Kästchen (1 %).</li>
+          <li><strong>2. Schritt (100 % = Grundwert):</strong> Multipliziere das Ergebnis mit 100 (<span class="ans">× 100</span>) → Das Ganze (100 %).</li>
+        </ol>
+      </div>
+
+      <!-- Teil 1: Schritt für Schritt -->
+      <div class="section-head">
+        🧗‍♂️ Teil 1: Der sichere Weg (Schritt für Schritt)
+      </div>
+      <div class="task-desc">
+        Aufgabe 1: Berechne zuerst den Wert für 1 % und dann das Ganze (100 %)!
+      </div>
+
+      <div class="step-grid">
+        <!-- 1a -->
+        <div class="step-card">
+          <div class="step-card-head">a) 💶 12 % sind 24 €</div>
+          <div class="step-row">
+            <span class="step-label">1 % (1 Kästchen):</span>
+            <span class="calc-line">24 € : 12 = <span class="ans">2 €</span></span>
+          </div>
+          <div class="step-row">
+            <span class="step-label">100 % (100 Kästchen):</span>
+            <span class="calc-line"><span class="ans">2 €</span> × 100 = <span class="ans">200 €</span></span>
+          </div>
+          <div class="result-badge">
+            ✓ Grundwert: <span class="ans">200 €</span>
+          </div>
+        </div>
+
+        <!-- 1b -->
+        <div class="step-card">
+          <div class="step-card-head">b) 🍎 5 % sind 15 kg</div>
+          <div class="step-row">
+            <span class="step-label">1 % (1 Kästchen):</span>
+            <span class="calc-line">15 kg : 5 = <span class="ans">3 kg</span></span>
+          </div>
+          <div class="step-row">
+            <span class="step-label">100 % (100 Kästchen):</span>
+            <span class="calc-line"><span class="ans">3 kg</span> × 100 = <span class="ans">300 kg</span></span>
+          </div>
+          <div class="result-badge">
+            ✓ Grundwert: <span class="ans">300 kg</span>
+          </div>
+        </div>
+
+        <!-- 1c -->
+        <div class="step-card">
+          <div class="step-card-head">c) 📏 25 % sind 50 m</div>
+          <div class="step-row">
+            <span class="step-label">1 % (1 Kästchen):</span>
+            <span class="calc-line">50 m : 25 = <span class="ans">2 m</span></span>
+          </div>
+          <div class="step-row">
+            <span class="step-label">100 % (100 Kästchen):</span>
+            <span class="calc-line"><span class="ans">2 m</span> × 100 = <span class="ans">200 m</span></span>
+          </div>
+          <div class="result-badge">
+            ✓ Grundwert: <span class="ans">200 m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teil 2: Kopfrechnen -->
+      <div class="section-head">
+        ⚡ Teil 2: Schnelles Rechnen (Kopfrechnen & Tempo-Training)
+      </div>
+      <div class="task-desc">
+        Aufgabe 2: Berechne den Grundwert (100 %) im Kopf. Notiere nur das Endergebnis.
+      </div>
+      <div style="font-size: 10pt; font-style: italic; margin-bottom: 6px; color: #333333;">
+        🧠 <strong>Tipp:</strong> Finde im Kopf zuerst 1 % (geteilt durch die Prozentzahl) und hänge zwei Nullen an (× 100).
+      </div>
+
+      <div class="table-container">
+        <table class="mental-table">
+          <tr>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">a) 🏃 2 % sind 14 m</span>
+                <span class="mental-right">→ 100 % = <span class="ans">700 m</span></span>
+              </div>
+            </td>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">f) 🍫 8 % sind 32 g</span>
+                <span class="mental-right">→ 100 % = <span class="ans">400 g</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">b) 💶 3 % sind 21 €</span>
+                <span class="mental-right">→ 100 % = <span class="ans">700 €</span></span>
+              </div>
+            </td>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">g) 👕 50 % sind 350 €</span>
+                <span class="mental-right">→ 100 % = <span class="ans">700 €</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">c) 🎒 10 % sind 45 kg</span>
+                <span class="mental-right">→ 100 % = <span class="ans">450 kg</span></span>
+              </div>
+            </td>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">h) ⏱️ 7 % sind 42 Min.</span>
+                <span class="mental-right">→ 100 % = <span class="ans">600 Min.</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">d) 🥛 4 % sind 12 Liter</span>
+                <span class="mental-right">→ 100 % = <span class="ans">300 Liter</span></span>
+              </div>
+            </td>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">i) 🚗 6 % sind 36 Autos</span>
+                <span class="mental-right">→ 100 % = <span class="ans">600 Autos</span></span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">e) 🚲 25 % sind 200 km</span>
+                <span class="mental-right">→ 100 % = <span class="ans">800 km</span></span>
+              </div>
+            </td>
+            <td>
+              <div class="mental-row">
+                <span class="mental-left">j) 🪙 11 % sind 55 Cent</span>
+                <span class="mental-right">→ 100 % = <span class="ans">500 Cent (5 €)</span></span>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- PAGE 2: TEXT- & SACHAUFGABEN (ALLTAGSANWENDUNG)                          -->
+  <!-- ========================================================================= -->
+  <div class="page">
+    <div>
+      <!-- Header Bar Page 2 -->
+      <table class="header-table">
+        <tr>
+          <td style="width: 45%;">👤 <strong>Name:</strong> <span class="ans">MUSTERLÖSUNG</span></td>
+          <td style="width: 25%;">🏫 <strong>Klasse:</strong> 8b</td>
+          <td style="width: 30%; text-align: right;" class="ans"><strong>Seite 2 (Lösungen)</strong></td>
+        </tr>
+      </table>
+
+      <!-- Section Head -->
+      <div class="section-head">
+        🌍 Teil 3: Das 100er-Feld im Alltag (Text- & Sachaufgaben)
+      </div>
+
+      <div class="word-problems-list">
+        <!-- Aufgabe 3 -->
+        <div class="problem-box">
+          <div class="problem-header">
+            🔋 Aufgabe 3: Der Smartphone-Akku
+          </div>
+          <div class="problem-text">
+            Dein Smartphone meldet: <em>„Nur noch 8 % Akku verbleibend!“</em>. In deinen Einstellungen siehst du, dass diese restlichen <strong>8 % genau 320 mAh</strong> entsprechen. Wie viel Kapazität in mAh hat der Akku insgesamt bei 100 % voller Ladung?
+          </div>
+          <div class="calc-area">
+            <div class="calc-row">
+              <span class="calc-tag">Rechnung:</span>
+              <span class="calc-content ans">
+                1 % = 320 mAh : 8 = 40 mAh &nbsp;|&nbsp; 100 % = 40 mAh × 100 = <strong>4.000 mAh</strong>
+              </span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-tag">Antwort:</span>
+              <span class="calc-content ans">
+                Der Akku hat bei 100 % voller Ladung eine Gesamtkapazität von <strong>4.000 mAh</strong>.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aufgabe 4 -->
+        <div class="problem-box">
+          <div class="problem-header">
+            ⚽ Aufgabe 4: Der Sportverein
+          </div>
+          <div class="problem-text">
+            In der Klasse 8b spielen <strong>6 Jugendliche</strong> im örtlichen Fußballverein. Der Trainer sagt: <em>„Das sind genau 20 % eurer gesamten Klasse!“</em> Wie viele Schülerinnen und Schüler hat die Klasse 8b insgesamt?
+          </div>
+          <div class="calc-area">
+            <div class="calc-row">
+              <span class="calc-tag">Rechnung:</span>
+              <span class="calc-content ans">
+                1 % = 6 : 20 = 0,3 Schüler &nbsp;|&nbsp; 100 % = 0,3 × 100 = <strong>30 Schüler</strong> (oder: 6 × 5 = 30)
+              </span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-tag">Antwort:</span>
+              <span class="calc-content ans">
+                Die Klasse 8b hat insgesamt <strong>30 Schülerinnen und Schüler</strong>.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aufgabe 5 -->
+        <div class="problem-box">
+          <div class="problem-header">
+            🎮 Aufgabe 5: Der Konsolen-Rabatt
+          </div>
+          <div class="problem-text">
+            Im Schaufenster eines Elektronikmarktes siehst du ein Schild: <em>„Heute 15 % gespart!“</em>. Du weißt, dass der Rabatt in Euro genau <strong>45 €</strong> beträgt. Wie viel hat die Konsole ursprünglich (100 %) gekostet?
+          </div>
+          <div class="calc-area">
+            <div class="calc-row">
+              <span class="calc-tag">Rechnung:</span>
+              <span class="calc-content ans">
+                1 % = 45 € : 15 = 3 € &nbsp;|&nbsp; 100 % = 3 € × 100 = <strong>300 €</strong>
+              </span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-tag">Antwort:</span>
+              <span class="calc-content ans">
+                Die Spielekonsole hat ursprünglich (100 %) genau <strong>300 €</strong> gekostet.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aufgabe 6 -->
+        <div class="problem-box">
+          <div class="problem-header">
+            🍕 Bonus-Aufgabe 6: Der Pizza-Hunger
+          </div>
+          <div class="problem-text">
+            Von einer großen Familien-Pizza werden 3 Stücke gegessen. Das sind genau <strong>30 % der Pizza</strong> und sie wiegen <strong>270 Gramm</strong>. Wie schwer war die gesamte Pizza (100 %) vor dem Anschneiden?
+          </div>
+          <div class="calc-area">
+            <div class="calc-row">
+              <span class="calc-tag">Rechnung:</span>
+              <span class="calc-content ans">
+                1 % = 270 g : 30 = 9 g &nbsp;|&nbsp; 100 % = 9 g × 100 = <strong>900 g</strong> (0,9 kg)
+              </span>
+            </div>
+            <div class="calc-row">
+              <span class="calc-tag">Antwort:</span>
+              <span class="calc-content ans">
+                Die gesamte Familien-Pizza wog vor dem Anschneiden genau <strong>900 Gramm</strong> (0,9 kg).
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Self Assessment at bottom -->
+    <div class="footer-eval">
+      <span><strong>Musterlösung für die Lehrkraft / Selbstkontrolle</strong></span>
+      <div class="eval-emojis">
+        <span style="font-size: 12pt; font-weight: bold;" class="ans">✓ Alle 6 Aufgaben vollständig gelöst</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

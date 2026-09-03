@@ -209,6 +209,110 @@ class SoundManager {
     osc.start(now);
     osc.stop(now + 0.045);
   }
+
+  // 7. Water Overflow & Splash Effect
+  public playOverflow() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // Splash noise
+    const bufferSize = Math.floor(ctx.sampleRate * 0.7);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.4));
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, now);
+    filter.frequency.linearRampToValueAtTime(300, now + 0.6);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    noise.start(now);
+
+    // Warning alarm tone alongside splash
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.setValueAtTime(160, now + 0.2);
+    osc.frequency.setValueAtTime(110, now + 0.4);
+
+    oscGain.gain.setValueAtTime(0.12, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+    osc.connect(oscGain);
+    oscGain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.56);
+  }
+
+  // 8. Continuous / Burst Pouring Sound
+  public playWaterStream(duration: number = 0.6, pitchRatio: number = 0.5) {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const dur = Math.max(0.1, duration);
+
+    // Noise component for water friction
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    const baseFreq = 400 + pitchRatio * 600;
+    filter.frequency.setValueAtTime(baseFreq, now);
+    filter.frequency.linearRampToValueAtTime(baseFreq + 150, now + dur);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+    gain.gain.setValueAtTime(0.12, now + dur - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + dur);
+
+    // Pitch bubble oscillator
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.linearRampToValueAtTime(baseFreq + 120, now + dur);
+
+    oscGain.gain.setValueAtTime(0.01, now);
+    oscGain.gain.linearRampToValueAtTime(0.08, now + 0.05);
+    oscGain.gain.setValueAtTime(0.08, now + dur - 0.05);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    osc.connect(oscGain);
+    oscGain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + dur);
+  }
 }
 
 export const sounds = new SoundManager();
